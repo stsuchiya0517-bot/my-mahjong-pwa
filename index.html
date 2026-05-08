@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f5132" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ひとり麻雀" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>ひとり麻雀 練習対局</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">iPhone用 / オフライン対応</p>
+        <h1>ひとり麻雀 練習対局</h1>
+      </div>
+      <button id="newGameBtn" class="small-btn">最初から</button>
+    </header>
+
+    <section class="scoreboard" id="scoreboard"></section>
+
+    <section class="status-card">
+      <div>
+        <p class="label">現在の局面</p>
+        <h2 id="roundTitle">東1局</h2>
+      </div>
+      <div>
+        <p class="label">山</p>
+        <h2 id="wallCount">0枚</h2>
+      </div>
+      <div>
+        <p class="label">あなたの状態</p>
+        <h2 id="playerState">配牌中</h2>
+      </div>
+    </section>
+
+    <main class="table-area">
+      <section class="opponent opponent-top" id="cpu2"></section>
+      <div class="middle-row">
+        <section class="opponent opponent-left" id="cpu3"></section>
+        <section class="center-panel">
+          <p id="message" class="message">対局を開始します。</p>
+          <div id="actionPanel" class="action-panel"></div>
+          <div class="dora-box">
+            <span>ドラ表示</span><strong id="doraIndicator">?</strong>
+          </div>
+          <div id="lastDiscard" class="last-discard"></div>
+        </section>
+        <section class="opponent opponent-right" id="cpu1"></section>
+      </div>
+
+      <section class="player-area">
+        <div class="area-head">
+          <div>
+            <p class="label">あなたの手牌</p>
+            <h2 id="handGuide">牌をタップして打牌</h2>
+          </div>
+          <div class="mini-stats" id="handStats"></div>
+        </div>
+        <div id="userMelds" class="melds"></div>
+        <div id="hand" class="hand"></div>
+        <div class="discards-wrap">
+          <p class="label">あなたの捨て牌</p>
+          <div id="userDiscards" class="discards"></div>
+        </div>
+      </section>
+    </main>
+
+    <section class="learn-panel">
+      <details open>
+        <summary>初心者ガイド：この画面で覚えること</summary>
+        <div class="learn-grid">
+          <article>
+            <h3>1. 目的</h3>
+            <p>14枚の手牌を「4つの面子 + 1つの雀頭」にすると和了です。面子は「順子 123」または「刻子 111」です。例外として「七対子」も和了形です。</p>
+          </article>
+          <article>
+            <h3>2. 自分の番</h3>
+            <p>山から1枚ツモり、不要な牌を1枚捨てます。和了できる場合は「ツモ」ボタンが出ます。テンパイなら「リーチ」が出ます。</p>
+          </article>
+          <article>
+            <h3>3. 鳴き</h3>
+            <p>他家の捨て牌で刻子を作るのがポン、左の人の捨て牌で順子を作るのがチーです。鳴くと手は早くなりますが、リーチや門前ツモは使えません。</p>
+          </article>
+          <article>
+            <h3>4. カン</h3>
+            <p>同じ牌4枚でカンできます。暗槓・大明槓・加槓に対応し、カン後は嶺上牌を引き、新ドラ表示が増えます。</p>
+          </article>
+          <article>
+            <h3>5. フリテン・喰い替え</h3>
+            <p>自分の捨て牌に待ち牌がある場合はロンできません。また、鳴いた直後に同じ構成牌を切る喰い替えは禁止です。</p>
+          </article>
+          <article>
+            <h3>6. 役・役満</h3>
+            <p>通常役に加えて、国士無双・大三元・四暗刻・字一色・清老頭・緑一色・小四喜・大四喜・四槓子・九蓮宝燈を個別判定します。</p>
+          </article>
+          <article>
+            <h3>7. 点数と符</h3>
+            <p>翻、符、親子、ロン/ツモ、満貫以上、役満、供託、本場を計算します。和了画面で符の内訳も確認できます。</p>
+          </article>
+          <article>
+            <h3>8. 練習のコツ</h3>
+            <p>最初は「字牌・端牌を切る」「同じ牌が2枚以上あるものを残す」「リーチできる形を目指す」だけで十分です。</p>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="log-panel">
+      <details>
+        <summary>対局ログ</summary>
+        <ol id="gameLog"></ol>
+      </details>
+    </section>
+  </div>
+
+  <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <h2 id="resultTitle">結果</h2>
+      <div id="resultBody"></div>
+      <button id="nextRoundBtn" class="primary-btn">次の局へ</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

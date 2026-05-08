@@ -1,0 +1,14 @@
+{
+  "name": "ひとり麻雀 練習対局",
+  "short_name": "ひとり麻雀",
+  "description": "CPU対戦・リーチ・鳴き・役判定・点数計算つきの初心者向け麻雀PWA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07140f",
+  "theme_color": "#0f5132",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
