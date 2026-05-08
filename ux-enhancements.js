@@ -4,13 +4,13 @@
   const UX = {
     selectedTileIndex: null,
     selectedTileText: "",
-    selectedAt: 0,
     lastMessage: "",
     lastDiscardText: "",
     toastTimer: null,
     observer: null,
     scheduled: false,
     enhancing: false,
+    allowNativeTileClick: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -47,7 +47,7 @@
     toast.classList.remove("is-visible");
     window.clearTimeout(UX.toastTimer);
     requestAnimationFrame(() => toast.classList.add("is-visible"));
-    UX.toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 1900);
+    UX.toastTimer = window.setTimeout(() => toast.classList.remove("is-visible"), 1450);
   }
 
   function ensureFloatingActionBar() {
@@ -62,6 +62,36 @@
     return bar;
   }
 
+  function selectedTile() {
+    if (UX.selectedTileIndex === null) return null;
+    return qsa(".hand .tile").find((tile) => Number(tile.dataset.uxIndex) === UX.selectedTileIndex) || null;
+  }
+
+  function clearSelection() {
+    UX.selectedTileIndex = null;
+    UX.selectedTileText = "";
+    qsa(".hand .tile.ux-selected").forEach((tile) => tile.classList.remove("ux-selected"));
+    const guide = $("handGuide");
+    if (guide && guide.textContent.includes("選択中")) guide.textContent = "牌をタップして選択 → 下のボタンで打牌";
+  }
+
+  function commitSelectedTile() {
+    const tile = selectedTile();
+    const button = tile ? qs("button", tile) : null;
+    if (!tile || !button) {
+      clearSelection();
+      updateFloatingActionBar();
+      return;
+    }
+    const text = tileText(tile);
+    showToast(`${text}を捨てます`);
+    UX.allowNativeTileClick = true;
+    button.click();
+    UX.allowNativeTileClick = false;
+    clearSelection();
+    scheduleEnhance();
+  }
+
   function cloneActionButton(button) {
     const clone = button.cloneNode(true);
     clone.removeAttribute("id");
@@ -72,20 +102,49 @@
     return clone;
   }
 
+  function buildButton(text, className, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
   function updateFloatingActionBar() {
     const source = $("actionPanel");
     const bar = ensureFloatingActionBar();
     if (!source) return;
-    const buttons = qsa("button", source).filter((button) => !button.disabled);
-    const signature = buttons.map((button) => button.textContent.trim()).join("|");
+
+    const hasSelection = UX.selectedTileIndex !== null && Boolean(selectedTile());
+    const actionButtons = qsa("button", source).filter((button) => !button.disabled);
+    const signature = hasSelection
+      ? `selected:${UX.selectedTileIndex}:${UX.selectedTileText}`
+      : `actions:${actionButtons.map((button) => button.textContent.trim()).join("|")}`;
 
     if (bar.dataset.signature !== signature) {
       bar.innerHTML = "";
-      buttons.slice(0, 4).forEach((button) => bar.appendChild(cloneActionButton(button)));
+      bar.className = "ux-floating-action-bar";
+
+      if (hasSelection) {
+        bar.classList.add("has-selection");
+        const label = document.createElement("div");
+        label.className = "ux-selection-label";
+        label.innerHTML = `<span>選択中</span><strong>${UX.selectedTileText}</strong>`;
+        bar.appendChild(label);
+        bar.appendChild(buildButton("この牌を捨てる", "action-btn good ux-discard-confirm", commitSelectedTile));
+        bar.appendChild(buildButton("取消", "action-btn secondary ux-cancel-selection", () => {
+          clearSelection();
+          showToast("選択を解除しました");
+          updateFloatingActionBar();
+        }));
+      } else {
+        actionButtons.slice(0, 4).forEach((button) => bar.appendChild(cloneActionButton(button)));
+      }
       bar.dataset.signature = signature;
     }
 
-    const visible = buttons.length > 0;
+    const visible = hasSelection || actionButtons.length > 0;
     setClass(bar, "is-visible", visible);
     setClass(document.body, "ux-action-bar-active", visible);
   }
@@ -161,6 +220,7 @@
     qsa(".hand .tile").forEach((tile, index) => {
       tile.dataset.uxIndex = String(index);
     });
+    if (UX.selectedTileIndex !== null && !selectedTile()) clearSelection();
   }
 
   function enhanceDrawnTile() {
@@ -169,9 +229,7 @@
     if (drawn) drawn.classList.add("ux-drawn");
     else {
       const handTiles = qsa(".hand .tile");
-      if (handTiles.length % 3 === 2 && handTiles.length > 0) {
-        handTiles[handTiles.length - 1].classList.add("ux-drawn");
-      }
+      if (handTiles.length % 3 === 2 && handTiles.length > 0) handTiles[handTiles.length - 1].classList.add("ux-drawn");
     }
   }
 
@@ -188,41 +246,29 @@
     hand.dataset.uxSelectionWired = "1";
 
     hand.addEventListener("click", (event) => {
+      if (UX.allowNativeTileClick) return true;
       const tile = event.target.closest(".tile");
       if (!tile || !hand.contains(tile)) return;
-      const button = event.target.closest("button");
       const text = tileText(tile);
       const index = Number(tile.dataset.uxIndex);
       if (!text || Number.isNaN(index)) return;
 
-      const now = Date.now();
-      const isSame = UX.selectedTileIndex === index;
-      const secondTap = isSame && now - UX.selectedAt < 2600;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
 
       tile.classList.remove("ux-tapped");
       void tile.offsetWidth;
       tile.classList.add("ux-tapped");
 
-      if (!secondTap) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-        UX.selectedTileIndex = index;
-        UX.selectedTileText = text;
-        UX.selectedAt = now;
-        markSelectedTile();
-        showToast(`${text}を選択。もう一度タップで捨てます`);
-        const guide = $("handGuide");
-        if (guide) guide.textContent = `${text}を選択中：もう一度タップで打牌`;
-        return false;
-      }
-
-      UX.selectedTileIndex = null;
-      UX.selectedTileText = "";
-      UX.selectedAt = 0;
-      showToast(`${text}を捨てます`);
-      if (button) button.blur();
-      return true;
+      UX.selectedTileIndex = index;
+      UX.selectedTileText = text;
+      markSelectedTile();
+      updateFloatingActionBar();
+      showToast(`${text}を選択しました`);
+      const guide = $("handGuide");
+      if (guide) guide.textContent = `${text}を選択中：下の「この牌を捨てる」で打牌`;
+      return false;
     }, true);
   }
 
@@ -231,10 +277,15 @@
       if (button.dataset.uxButtonWired === "1") return;
       button.dataset.uxButtonWired = "1";
       button.addEventListener("click", () => {
-        button.style.transform = "scale(0.96)";
-        window.setTimeout(() => { button.style.transform = ""; }, 120);
+        button.style.transform = "scale(0.97)";
+        window.setTimeout(() => { button.style.transform = ""; }, 100);
       });
     });
+  }
+
+  function collapseLearningPanelOnPhone() {
+    const details = qs(".learn-panel details");
+    if (details && window.matchMedia("(max-width: 760px)").matches) details.removeAttribute("open");
   }
 
   function enhanceScreen() {
@@ -262,6 +313,7 @@
   }
 
   function init() {
+    collapseLearningPanelOnPhone();
     ensureToast();
     ensureFloatingActionBar();
     enhanceScreen();
@@ -279,9 +331,6 @@
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();
