@@ -2,12 +2,15 @@
   "use strict";
 
   const UX = {
-    selectedTileText: null,
+    selectedTileIndex: null,
+    selectedTileText: "",
     selectedAt: 0,
     lastMessage: "",
     lastDiscardText: "",
     toastTimer: null,
     observer: null,
+    scheduled: false,
+    enhancing: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -18,6 +21,12 @@
     if (!tileEl) return "";
     const button = qs("button", tileEl);
     return (button ? button.textContent : tileEl.textContent || "").trim();
+  }
+
+  function setClass(el, className, enabled) {
+    if (!el) return;
+    if (enabled && !el.classList.contains(className)) el.classList.add(className);
+    if (!enabled && el.classList.contains(className)) el.classList.remove(className);
   }
 
   function ensureToast() {
@@ -68,17 +77,17 @@
     const bar = ensureFloatingActionBar();
     if (!source) return;
     const buttons = qsa("button", source).filter((button) => !button.disabled);
-    bar.innerHTML = "";
+    const signature = buttons.map((button) => button.textContent.trim()).join("|");
 
-    if (buttons.length === 0) {
-      bar.classList.remove("is-visible");
-      document.body.classList.remove("ux-action-bar-active");
-      return;
+    if (bar.dataset.signature !== signature) {
+      bar.innerHTML = "";
+      buttons.slice(0, 4).forEach((button) => bar.appendChild(cloneActionButton(button)));
+      bar.dataset.signature = signature;
     }
 
-    buttons.slice(0, 4).forEach((button) => bar.appendChild(cloneActionButton(button)));
-    bar.classList.add("is-visible");
-    document.body.classList.add("ux-action-bar-active");
+    const visible = buttons.length > 0;
+    setClass(bar, "is-visible", visible);
+    setClass(document.body, "ux-action-bar-active", visible);
   }
 
   function parseCurrentPlayerName() {
@@ -90,24 +99,21 @@
   }
 
   function enhanceTurnVisibility() {
-    qsa(".score-card, .opponent").forEach((el) => {
-      el.classList.remove("ux-active-player", "ux-thinking");
-    });
-    qs(".player-area")?.classList.remove("ux-player-turn");
-
     const activeCard = qs(".score-card.active");
     const currentName = parseCurrentPlayerName();
-    if (activeCard) activeCard.classList.add("ux-active-player");
 
-    if (currentName && currentName !== "あなた") {
-      const opponent = qsa(".opponent").find((el) => el.textContent.includes(currentName));
-      if (opponent) {
-        opponent.classList.add("ux-active-player", "ux-thinking");
-      }
-      if (activeCard) activeCard.classList.add("ux-thinking");
-    } else {
-      qs(".player-area")?.classList.add("ux-player-turn");
-    }
+    qsa(".score-card").forEach((el) => {
+      setClass(el, "ux-active-player", el === activeCard);
+      setClass(el, "ux-thinking", el === activeCard && Boolean(currentName && currentName !== "あなた"));
+    });
+
+    qsa(".opponent").forEach((el) => {
+      const isActiveOpponent = Boolean(currentName && currentName !== "あなた" && el.textContent.includes(currentName));
+      setClass(el, "ux-active-player", isActiveOpponent);
+      setClass(el, "ux-thinking", isActiveOpponent);
+    });
+
+    setClass(qs(".player-area"), "ux-player-turn", !currentName || currentName === "あなた");
 
     const center = qs(".center-panel");
     if (center && !qs(".ux-turn-ribbon", center)) {
@@ -117,7 +123,8 @@
       center.appendChild(ribbon);
     }
     const ribbon = $("uxTurnRibbon");
-    if (ribbon) ribbon.textContent = currentName && currentName !== "あなた" ? `${currentName}の手番` : "あなたの手番";
+    const ribbonText = currentName && currentName !== "あなた" ? `${currentName}の手番` : "あなたの手番";
+    if (ribbon && ribbon.textContent !== ribbonText) ribbon.textContent = ribbonText;
   }
 
   function enhanceMessageMotion() {
@@ -150,6 +157,12 @@
     qsa(".last-discard .tile").forEach((tile) => tile.classList.add("ux-recent-discard"));
   }
 
+  function indexHandTiles() {
+    qsa(".hand .tile").forEach((tile, index) => {
+      tile.dataset.uxIndex = String(index);
+    });
+  }
+
   function enhanceDrawnTile() {
     qsa(".hand .tile").forEach((tile) => tile.classList.remove("ux-drawn"));
     const drawn = qs(".hand .tile.drawn");
@@ -164,8 +177,8 @@
 
   function markSelectedTile() {
     qsa(".hand .tile").forEach((tile) => {
-      const isSelected = UX.selectedTileText && tileText(tile) === UX.selectedTileText;
-      tile.classList.toggle("ux-selected", Boolean(isSelected));
+      const isSelected = UX.selectedTileIndex !== null && Number(tile.dataset.uxIndex) === UX.selectedTileIndex;
+      setClass(tile, "ux-selected", isSelected);
     });
   }
 
@@ -179,10 +192,11 @@
       if (!tile || !hand.contains(tile)) return;
       const button = event.target.closest("button");
       const text = tileText(tile);
-      if (!text) return;
+      const index = Number(tile.dataset.uxIndex);
+      if (!text || Number.isNaN(index)) return;
 
       const now = Date.now();
-      const isSame = UX.selectedTileText === text;
+      const isSame = UX.selectedTileIndex === index;
       const secondTap = isSame && now - UX.selectedAt < 2600;
 
       tile.classList.remove("ux-tapped");
@@ -193,6 +207,7 @@
         event.preventDefault();
         event.stopPropagation();
         if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        UX.selectedTileIndex = index;
         UX.selectedTileText = text;
         UX.selectedAt = now;
         markSelectedTile();
@@ -202,7 +217,8 @@
         return false;
       }
 
-      UX.selectedTileText = null;
+      UX.selectedTileIndex = null;
+      UX.selectedTileText = "";
       UX.selectedAt = 0;
       showToast(`${text}を捨てます`);
       if (button) button.blur();
@@ -222,6 +238,9 @@
   }
 
   function enhanceScreen() {
+    if (UX.enhancing) return;
+    UX.enhancing = true;
+    indexHandTiles();
     wireTileSelection();
     enhanceDrawnTile();
     markSelectedTile();
@@ -230,10 +249,16 @@
     enhanceMessageMotion();
     updateFloatingActionBar();
     enhanceButtons();
+    UX.enhancing = false;
   }
 
   function scheduleEnhance() {
-    window.requestAnimationFrame(enhanceScreen);
+    if (UX.scheduled || UX.enhancing) return;
+    UX.scheduled = true;
+    window.requestAnimationFrame(() => {
+      UX.scheduled = false;
+      enhanceScreen();
+    });
   }
 
   function init() {
