@@ -7,7 +7,7 @@ struct ActionBarView: View {
         VStack(spacing: 8) {
             if let selected = game.selectedTile {
                 HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("選択中")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.68))
@@ -18,23 +18,35 @@ struct ActionBarView: View {
                     .frame(width: 76, alignment: .leading)
 
                     Button {
-                        game.discardSelectedTile()
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.75)) {
+                            game.discardSelectedTile()
+                        }
                     } label: {
-                        Text("捨てる")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 54)
+                        VStack(spacing: 4) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.system(size: 18, weight: .bold))
+                            Text("捨てる")
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
                     .disabled(!game.canDiscard)
 
                     Button {
-                        game.cancelSelection()
+                        withAnimation(.easeInOut(duration: 0.16)) {
+                            game.cancelSelection()
+                        }
                     } label: {
-                        Text("取消")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .frame(width: 54, height: 54)
+                        VStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .bold))
+                            Text("取消")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                        }
+                        .frame(width: 58, height: 58)
                     }
                     .buttonStyle(.bordered)
                     .tint(.white)
@@ -42,37 +54,45 @@ struct ActionBarView: View {
             } else {
                 HStack(spacing: 10) {
                     Button {
-                        game.drawForUserIfNeeded()
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            game.drawForUserIfNeeded()
+                        }
                     } label: {
-                        Text("ツモ")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                        VStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 17, weight: .bold))
+                            Text("ツモ")
+                                .font(.system(size: 17, weight: .black, design: .rounded))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
                     .disabled(game.currentPlayerIndex != 0 || game.isBusy)
 
                     Button {
-                        game.startNewGame()
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            game.startNewGame()
+                        }
                     } label: {
-                        Text("最初から")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
+                        VStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 17, weight: .bold))
+                            Text("最初から")
+                                .font(.system(size: 17, weight: .black, design: .rounded))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
                     }
                     .buttonStyle(.bordered)
                     .tint(.white)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .padding(.bottom, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.35), radius: 22, x: 0, y: 12)
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
+        .padding(12)
+        .background(.ultraThinMaterial.opacity(0.96))
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .shadow(color: .black.opacity(0.26), radius: 18, x: 0, y: 8)
     }
 }
