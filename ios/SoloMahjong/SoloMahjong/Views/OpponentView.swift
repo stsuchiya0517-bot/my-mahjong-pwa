@@ -9,30 +9,32 @@ struct OpponentView: View {
     let player: MahjongPlayer
     let isActive: Bool
     let layoutStyle: OpponentLayoutStyle
+    var riverRotation: Angle = .degrees(0)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             topRow
-            concealedHandRow
             discardSection
+            if !player.melds.isEmpty {
+                MeldsView(melds: player.melds, rotation: riverRotation)
+            }
+            concealedHandRow
 
             if player.isThinking {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(.yellow)
-                        .frame(width: 6, height: 6)
+                HStack(spacing: 5) {
+                    Circle().fill(.yellow).frame(width: 5, height: 5)
                     Text("考え中…")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(.yellow)
                 }
                 .transition(.opacity)
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity)
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.white.opacity(isActive ? 0.14 : 0.08))
+                .fill(.white.opacity(isActive ? 0.14 : 0.075))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(isActive ? .yellow.opacity(0.8) : .white.opacity(0.12), lineWidth: isActive ? 1.6 : 1)
@@ -43,88 +45,128 @@ struct OpponentView: View {
     }
 
     private var topRow: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Text(player.name)
-                .font(.system(size: layoutStyle == .top ? 14 : 13, weight: .black, design: .rounded))
+                .font(.system(size: layoutStyle == .top ? 13 : 12, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
 
-            if player.isDealer {
-                badge("親", bg: .yellow, fg: .black)
-            }
-
-            if player.isReach {
-                badge("リーチ", bg: .red, fg: .white)
-            }
+            if player.isDealer { badge("親", bg: .yellow, fg: .black) }
+            if player.isReach { badge("リーチ", bg: .red, fg: .white) }
 
             Spacer(minLength: 4)
 
             Text("\(player.score)")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
     }
 
+    private var discardSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("河")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.6))
+            RiverGrid(tiles: player.discards, rotation: riverRotation, columns: layoutStyle == .top ? 10 : 4, tileSize: .small)
+        }
+    }
+
     private var concealedHandRow: some View {
         HStack(spacing: 3) {
             ForEach(0..<min(player.hand.count, layoutStyle == .top ? 13 : 8), id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.12, green: 0.44, blue: 0.78),
-                                Color(red: 0.07, green: 0.30, blue: 0.62)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: layoutStyle == .top ? 16 : 12, height: layoutStyle == .top ? 26 : 22)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(.white.opacity(0.16), lineWidth: 1)
-                    )
+                HiddenTileBack(isTop: layoutStyle == .top)
             }
             Spacer(minLength: 0)
         }
     }
 
-    private var discardSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("捨て牌")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.6))
-
-            discardGrid
-        }
-    }
-
-    private var discardGrid: some View {
-        let maxColumns = layoutStyle == .top ? 6 : 3
-        let columns = Array(repeating: GridItem(.fixed(34), spacing: 4), count: maxColumns)
-
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
-            ForEach(player.discards) { tile in
-                TileView(tile: tile, isDiscard: true, isCompact: true)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(6)
-        .background(.black.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
     private func badge(_ text: String, bg: Color, fg: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .black, design: .rounded))
-            .padding(.horizontal, 6)
+            .font(.system(size: 9, weight: .black, design: .rounded))
+            .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(bg)
             .foregroundStyle(fg)
             .clipShape(Capsule())
+    }
+}
+
+private struct HiddenTileBack: View {
+    let isTop: Bool
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.93, green: 0.66, blue: 0.21), Color(red: 0.73, green: 0.45, blue: 0.08)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: isTop ? 15 : 12, height: isTop ? 23 : 19)
+
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color(red: 0.985, green: 0.985, blue: 0.965))
+                .frame(width: isTop ? 15 : 12, height: isTop ? 3.8 : 3.2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .stroke(Color.white.opacity(0.7), lineWidth: 0.7)
+                )
+        }
+        .shadow(color: .black.opacity(0.16), radius: 1.6, x: 0, y: 1.2)
+    }
+}
+
+
+struct MeldsView: View {
+    let melds: [MahjongMeld]
+    var rotation: Angle = .degrees(0)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("副露")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.6))
+
+            HStack(spacing: 6) {
+                ForEach(melds) { meld in
+                    MeldSetView(meld: meld, rotation: rotation)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
+struct MeldSetView: View {
+    let meld: MahjongMeld
+    var rotation: Angle = .degrees(0)
+
+    var body: some View {
+        HStack(spacing: -2) {
+            ForEach(Array(meld.tiles.enumerated()), id: \.element.id) { index, tile in
+                TileView(tile: tile, isDiscard: true, isCompact: true, displayStyle: .river)
+                    .rotationEffect(tile.id == meld.calledTile?.id ? rotation + .degrees(90) : rotation)
+                    .zIndex(Double(index))
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(.black.opacity(0.14))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            Text(meld.type.rawValue)
+                .font(.system(size: 7, weight: .black, design: .rounded))
+                .foregroundStyle(.yellow.opacity(0.9))
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .background(.black.opacity(0.35))
+                .clipShape(Capsule())
+                .offset(x: 2, y: -5)
+        }
     }
 }
