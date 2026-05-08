@@ -1,9 +1,11 @@
-const CACHE_NAME = "solo-mahjong-pwa-v2";
+const CACHE_NAME = "solo-mahjong-pwa-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./ux-enhancements.css",
   "./app.js",
+  "./ux-enhancements.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
