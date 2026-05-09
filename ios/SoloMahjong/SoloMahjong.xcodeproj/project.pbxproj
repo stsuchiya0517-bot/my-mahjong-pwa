@@ -16,6 +16,17 @@
 		A10000000000000000000007 /* OpponentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* OpponentView.swift */; };
 		A10000000000000000000008 /* ActionBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ActionBarView.swift */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Assets.xcassets */; };
+		A10000000000000000000011 /* MahjongRound.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* MahjongRound.swift */; };
+		A10000000000000000000012 /* GameBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* GameBoardView.swift */; };
+		A10000000000000000000013 /* PortraitGameBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* PortraitGameBoardView.swift */; };
+		A10000000000000000000014 /* LandscapeGameBoardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* LandscapeGameBoardView.swift */; };
+		A10000000000000000000015 /* AutoTableCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* AutoTableCenterView.swift */; };
+		A10000000000000000000016 /* WallTileBackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* WallTileBackView.swift */; };
+		A10000000000000000000017 /* RiverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* RiverView.swift */; };
+		A10000000000000000000018 /* PlayerHandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* PlayerHandView.swift */; };
+		A10000000000000000000019 /* MeldAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* MeldAreaView.swift */; };
+		A10000000000000000000020 /* GameHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* GameHUDView.swift */; };
+		A10000000000000000000021 /* WinResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* WinResultView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +40,17 @@
 		A20000000000000000000008 /* ActionBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBarView.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000010 /* SoloMahjong.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoloMahjong.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000011 /* MahjongRound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MahjongRound.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* GameBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameBoardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* PortraitGameBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitGameBoardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* LandscapeGameBoardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandscapeGameBoardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000015 /* AutoTableCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTableCenterView.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* WallTileBackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallTileBackView.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* RiverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiverView.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* PlayerHandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerHandView.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* MeldAreaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeldAreaView.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* GameHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHUDView.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* WinResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinResultView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +98,7 @@
 			children = (
 				A20000000000000000000003 /* MahjongTile.swift */,
 				A20000000000000000000004 /* MahjongPlayer.swift */,
+				A20000000000000000000011 /* MahjongRound.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -94,6 +117,16 @@
 				A20000000000000000000006 /* TileView.swift */,
 				A20000000000000000000007 /* OpponentView.swift */,
 				A20000000000000000000008 /* ActionBarView.swift */,
+				A20000000000000000000012 /* GameBoardView.swift */,
+				A20000000000000000000013 /* PortraitGameBoardView.swift */,
+				A20000000000000000000014 /* LandscapeGameBoardView.swift */,
+				A20000000000000000000015 /* AutoTableCenterView.swift */,
+				A20000000000000000000016 /* WallTileBackView.swift */,
+				A20000000000000000000017 /* RiverView.swift */,
+				A20000000000000000000018 /* PlayerHandView.swift */,
+				A20000000000000000000019 /* MeldAreaView.swift */,
+				A20000000000000000000020 /* GameHUDView.swift */,
+				A20000000000000000000021 /* WinResultView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -172,10 +205,21 @@
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				A10000000000000000000003 /* MahjongTile.swift in Sources */,
 				A10000000000000000000004 /* MahjongPlayer.swift in Sources */,
+				A10000000000000000000011 /* MahjongRound.swift in Sources */,
 				A10000000000000000000005 /* MahjongGameViewModel.swift in Sources */,
 				A10000000000000000000006 /* TileView.swift in Sources */,
 				A10000000000000000000007 /* OpponentView.swift in Sources */,
 				A10000000000000000000008 /* ActionBarView.swift in Sources */,
+				A10000000000000000000012 /* GameBoardView.swift in Sources */,
+				A10000000000000000000013 /* PortraitGameBoardView.swift in Sources */,
+				A10000000000000000000014 /* LandscapeGameBoardView.swift in Sources */,
+				A10000000000000000000015 /* AutoTableCenterView.swift in Sources */,
+				A10000000000000000000016 /* WallTileBackView.swift in Sources */,
+				A10000000000000000000017 /* RiverView.swift in Sources */,
+				A10000000000000000000018 /* PlayerHandView.swift in Sources */,
+				A10000000000000000000019 /* MeldAreaView.swift in Sources */,
+				A10000000000000000000020 /* GameHUDView.swift in Sources */,
+				A10000000000000000000021 /* WinResultView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

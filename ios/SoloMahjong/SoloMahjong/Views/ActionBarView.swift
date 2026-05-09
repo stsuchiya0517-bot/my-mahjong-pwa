@@ -13,9 +13,19 @@ struct ActionBarView: View {
             }
         }
         .padding(8)
-        .background(.ultraThinMaterial.opacity(0.96))
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: .black.opacity(0.26), radius: 18, x: 0, y: 8)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.72), Color.black.opacity(0.48)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.35), radius: 14, x: 0, y: 6)
     }
 
     private var verticalBody: some View {
@@ -99,11 +109,15 @@ struct ActionBarView: View {
                 Text("捨てる")
                     .font(.system(size: 15, weight: .black, design: .rounded))
             }
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: height)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.green)
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(game.canDiscard ? Color(red: 0.08, green: 0.52, blue: 0.22) : Color.gray.opacity(0.45))
+        )
         .disabled(!game.canDiscard)
     }
 
@@ -113,11 +127,15 @@ struct ActionBarView: View {
         } label: {
             Text("取消")
                 .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: height)
         }
-        .buttonStyle(.bordered)
-        .tint(.white)
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.white.opacity(0.18))
+        )
     }
 
     private func tsumoButton(height: CGFloat) -> some View {
@@ -131,11 +149,15 @@ struct ActionBarView: View {
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .multilineTextAlignment(.center)
             }
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: height)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.blue)
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(game.canTsumoWin ? Color(red: 0.08, green: 0.40, blue: 0.92) : Color.gray.opacity(0.40))
+        )
         .disabled(!game.canTsumoWin)
     }
 
@@ -149,10 +171,14 @@ struct ActionBarView: View {
                 Text("最初から")
                     .font(.system(size: 14, weight: .black, design: .rounded))
             }
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: height)
         }
-        .buttonStyle(.bordered)
-        .tint(.white)
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.white.opacity(0.18))
+        )
     }
 }

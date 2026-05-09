@@ -22,11 +22,15 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var message: String = "新しい対局を開始します。"
     @Published var lastDiscard: MahjongTile?
     @Published var lastDiscardPlayerIndex: Int?
-    @Published var roundTitle: String = "東1局"
+    @Published var roundState = MahjongRoundState()
     @Published var turnNumber: Int = 1
     @Published var isBusy: Bool = false
     @Published var actionLog: [String] = []
     @Published var winningResult: WinResult?
+    @Published var lastTappedTileID: MahjongTile.ID?
+    @Published var lastTapDate: Date = .distantPast
+
+    var roundTitle: String { roundState.title }
 
     var user: MahjongPlayer { players[0] }
 
@@ -44,17 +48,47 @@ final class MahjongGameViewModel: ObservableObject {
         return evaluateWin(for: players[0].hand, playerIndex: 0, method: "ツモ") != nil
     }
 
+    var shantenText: String {
+        guard players.indices.contains(0) else { return "--向聴" }
+        let count = tileCounts(players[0].hand)
+        let pairs = count.values.filter { $0 >= 2 }.count
+        let meldLike = count.values.filter { $0 >= 3 }.count
+        let estimate = max(0, 6 - pairs - meldLike * 2)
+        return "\(estimate)向聴"
+    }
+
     init() {
         startNewGame()
     }
 
+    func startMatch() {
+        roundState = MahjongRoundState()
+        startRound(resetScores: true)
+    }
+
     func startNewGame() {
+        startMatch()
+    }
+
+    func advanceToNextRound() {
+        roundState.advanceDealer()
+        startRound(resetScores: false)
+    }
+
+    private func startRound(resetScores: Bool) {
+        let oldScores = players.map(\.score)
         players = [
-            MahjongPlayer(name: "あなた", isDealer: true),
+            MahjongPlayer(name: "あなた"),
             MahjongPlayer(name: "CPU右"),
             MahjongPlayer(name: "CPU対面"),
             MahjongPlayer(name: "CPU左")
         ]
+        for index in players.indices {
+            players[index].isDealer = index == roundState.dealerIndex
+            if !resetScores, oldScores.indices.contains(index) {
+                players[index].score = oldScores[index]
+            }
+        }
         wall = Self.makeWall().shuffled()
         selectedTileID = nil
         currentPlayerIndex = 0
@@ -62,11 +96,12 @@ final class MahjongGameViewModel: ObservableObject {
         lastDiscard = nil
         lastDiscardPlayerIndex = nil
         winningResult = nil
-        roundTitle = "東1局"
         turnNumber = 1
+        lastTappedTileID = nil
+        lastTapDate = .distantPast
         actionLog.removeAll()
         dealInitialHands()
-        log("東1局開始。あなたが親です。")
+        log("\(roundState.detailTitle)開始。\(players[roundState.dealerIndex].name)が親です。")
     }
 
     func select(tile: MahjongTile) {
@@ -75,6 +110,21 @@ final class MahjongGameViewModel: ObservableObject {
             selectedTileID = tile.id
         }
         message = "\(tile.label)を選択中。右の『捨てる』で打牌します。"
+    }
+
+    func handleHandTap(_ tile: MahjongTile) {
+        guard currentPlayerIndex == 0, !isBusy, winningResult == nil else { return }
+        let now = Date()
+        if lastTappedTileID == tile.id, now.timeIntervalSince(lastTapDate) < 0.34 {
+            selectedTileID = tile.id
+            discardSelectedTile()
+            lastTappedTileID = nil
+            lastTapDate = .distantPast
+        } else {
+            lastTappedTileID = tile.id
+            lastTapDate = now
+            select(tile: tile)
+        }
     }
 
     func discardSelectedTile() {
@@ -92,6 +142,7 @@ final class MahjongGameViewModel: ObservableObject {
             lastDiscard = tile
             lastDiscardPlayerIndex = 0
             self.selectedTileID = nil
+            lastTappedTileID = nil
             message = "あなたは\(tile.label)を捨てました。"
             log("あなた：\(tile.label)を打牌")
         }
@@ -105,6 +156,7 @@ final class MahjongGameViewModel: ObservableObject {
 
     func cancelSelection() {
         selectedTileID = nil
+        lastTappedTileID = nil
         message = "牌を選んでください。"
     }
 
@@ -128,6 +180,7 @@ final class MahjongGameViewModel: ObservableObject {
             return
         }
         winningResult = result
+        applyWinScore(playerIndex: 0, method: "ツモ")
         message = "\(result.title)"
         log("あなた：\(result.title) / \(result.yaku.joined(separator: ", "))")
     }
@@ -246,6 +299,7 @@ final class MahjongGameViewModel: ObservableObject {
 
         if let result = evaluateWin(for: players[index].hand, playerIndex: index, method: "ツモ") {
             winningResult = result
+            applyWinScore(playerIndex: index, method: "ツモ")
             message = "\(players[index].name)がツモ和了しました。"
             log("\(players[index].name)：\(result.title)")
             return
@@ -257,6 +311,7 @@ final class MahjongGameViewModel: ObservableObject {
         withAnimation(.easeInOut(duration: 0.22)) {
             let tile = players[index].hand.remove(at: discardIndex)
             players[index].discards.append(tile)
+            maybeDeclareReach(playerIndex: index, tile: tile)
             lastDiscard = tile
             lastDiscardPlayerIndex = index
             message = "\(players[index].name)は\(tile.label)を捨てました。"
@@ -283,10 +338,32 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func drawTile() -> MahjongTile? {
         guard !wall.isEmpty else {
-            message = "流局です。新しい局を開始してください。"
+            message = "流局です。次局へ進みます。"
+            roundState.honba += 1
+            Task {
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                advanceToNextRound()
+            }
             return nil
         }
         return wall.removeLast()
+    }
+
+    private func maybeDeclareReach(playerIndex: Int, tile: MahjongTile) {
+        guard players.indices.contains(playerIndex), !players[playerIndex].isReach else { return }
+        guard players[playerIndex].melds.isEmpty, turnNumber > 4, Bool.random() else { return }
+        players[playerIndex].isReach = true
+        players[playerIndex].reachDiscardID = tile.id
+        players[playerIndex].score -= 1000
+        roundState.riichiSticks += 1
+        log("\(players[playerIndex].name)：リーチ")
+    }
+
+    private func applyWinScore(playerIndex: Int, method: String) {
+        guard players.indices.contains(playerIndex) else { return }
+        let gain = method == "ツモ" ? 2000 + roundState.riichiSticks * 1000 : 1000
+        players[playerIndex].score += gain
+        roundState.riichiSticks = 0
     }
 
     private func log(_ text: String) {

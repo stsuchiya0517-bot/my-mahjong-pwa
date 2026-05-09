@@ -24,6 +24,7 @@ struct MahjongPlayer: Identifiable, Hashable {
     var isDealer: Bool = false
     var isThinking: Bool = false
     var isReach: Bool = false
+    var reachDiscardID: MahjongTile.ID?
 
     var handCountText: String {
         "手牌 \(hand.count)枚"
