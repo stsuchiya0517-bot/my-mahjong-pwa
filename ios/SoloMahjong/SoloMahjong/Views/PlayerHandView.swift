@@ -25,17 +25,23 @@ struct PlayerHandView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
             .background(
-                LinearGradient(
-                    colors: [Color.black.opacity(0.34), Color.black.opacity(0.14)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+                ZStack {
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.46), Color.black.opacity(0.16)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    Rectangle()
+                        .fill(Color(red: 0.11, green: 0.31, blue: 0.14).opacity(0.24))
+                        .blur(radius: 10)
+                }
             )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(game.currentPlayerIndex == 0 ? Color.yellow.opacity(0.55) : Color.white.opacity(0.10), lineWidth: 1.2)
+                    .stroke(game.currentPlayerIndex == 0 ? Color.yellow.opacity(0.72) : Color.white.opacity(0.10), lineWidth: 1.4)
             )
+            .shadow(color: Color.yellow.opacity(game.currentPlayerIndex == 0 ? 0.18 : 0), radius: 12, x: 0, y: 0)
         }
     }
 }

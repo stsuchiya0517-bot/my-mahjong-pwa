@@ -3,6 +3,7 @@ import SwiftUI
 struct PortraitGameBoardView: View {
     @ObservedObject var game: MahjongGameViewModel
     let onMenu: () -> Void
+    @State private var showsAssistPanel = false
 
     var body: some View {
         GeometryReader { geo in
@@ -36,6 +37,12 @@ struct PortraitGameBoardView: View {
                     .frame(width: centerSize, height: centerSize)
                     .position(center)
 
+                TableEventBannerView(message: game.message, tone: game.eventTone)
+                    .id(game.message)
+                    .frame(width: min(w - 42, 320))
+                    .position(x: center.x, y: center.y - centerSize * 0.78)
+                    .animation(.spring(response: 0.26, dampingFraction: 0.82), value: game.message)
+
                 RiverView(tiles: game.players[safe: 2]?.discards ?? [], reachDiscardID: game.players[safe: 2]?.reachDiscardID, seat: .top)
                     .frame(width: min(w * 0.50, 210), height: 74)
                     .position(x: center.x, y: center.y - tableHalf)
@@ -68,8 +75,24 @@ struct PortraitGameBoardView: View {
                     .frame(width: w - 14, height: 78)
                     .position(x: w / 2, y: handY)
 
-                assistStrip(width: w)
+                assistStrip(width: w) {
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                        showsAssistPanel.toggle()
+                    }
+                }
                     .position(x: w / 2, y: handY - 54)
+
+                if showsAssistPanel {
+                    AssistPanelView(game: game) {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showsAssistPanel = false
+                        }
+                    }
+                    .frame(width: min(w - 34, 340))
+                    .position(x: w / 2, y: handY - 170)
+                    .transition(.scale(scale: 0.96).combined(with: .opacity))
+                    .zIndex(10)
+                }
 
                 ActionBarView(game: game, isHorizontal: true)
                     .frame(width: w - 18, height: 72)
@@ -80,9 +103,9 @@ struct PortraitGameBoardView: View {
         }
     }
 
-    private func assistStrip(width: CGFloat) -> some View {
+    private func assistStrip(width: CGFloat, onAssist: @escaping () -> Void) -> some View {
         HStack {
-            Button {} label: {
+            Button(action: onAssist) {
                 Label("アシスト", systemImage: "sparkle.magnifyingglass")
                     .font(.system(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color(red: 0.97, green: 0.88, blue: 0.56))

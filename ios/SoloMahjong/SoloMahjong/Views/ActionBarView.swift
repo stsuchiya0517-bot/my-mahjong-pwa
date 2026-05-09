@@ -14,11 +14,14 @@ struct ActionBarView: View {
         }
         .padding(8)
         .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.72), Color.black.opacity(0.48)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            ZStack {
+                LinearGradient(
+                    colors: [Color.black.opacity(0.78), Color.black.opacity(0.52)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                Rectangle().fill(.white.opacity(0.035))
+            }
         )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
@@ -117,6 +120,10 @@ struct ActionBarView: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(game.canDiscard ? Color(red: 0.08, green: 0.52, blue: 0.22) : Color.gray.opacity(0.45))
+                .overlay(
+                    LinearGradient(colors: [.white.opacity(0.18), .clear], startPoint: .top, endPoint: .bottom)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                )
         )
         .disabled(!game.canDiscard)
     }
@@ -157,6 +164,10 @@ struct ActionBarView: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(game.canTsumoWin ? Color(red: 0.08, green: 0.40, blue: 0.92) : Color.gray.opacity(0.40))
+                .overlay(
+                    LinearGradient(colors: [.white.opacity(0.16), .clear], startPoint: .top, endPoint: .bottom)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                )
         )
         .disabled(!game.canTsumoWin)
     }

@@ -3,6 +3,7 @@ import SwiftUI
 struct LandscapeGameBoardView: View {
     @ObservedObject var game: MahjongGameViewModel
     let onMenu: () -> Void
+    @State private var showsAssistPanel = false
 
     var body: some View {
         GeometryReader { geo in
@@ -40,6 +41,12 @@ struct LandscapeGameBoardView: View {
                     .frame(width: min(h * 0.34, 150), height: min(h * 0.34, 150))
                     .position(center)
 
+                TableEventBannerView(message: game.message, tone: game.eventTone)
+                    .id(game.message)
+                    .frame(width: min(boardWidth * 0.42, 310))
+                    .position(x: center.x, y: max(safe.top + 70, center.y - 156))
+                    .animation(.spring(response: 0.26, dampingFraction: 0.82), value: game.message)
+
                 RiverView(tiles: game.players[safe: 2]?.discards ?? [], reachDiscardID: game.players[safe: 2]?.reachDiscardID, seat: .top)
                     .frame(width: 220, height: 70)
                     .position(x: center.x, y: center.y - 124)
@@ -63,6 +70,33 @@ struct LandscapeGameBoardView: View {
                 PlayerHandView(game: game, tileStyle: .hand)
                     .frame(width: min(boardWidth - 24, 520), height: 60)
                     .position(x: center.x, y: h - safe.bottom - 30)
+
+                Button {
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+                        showsAssistPanel.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color(red: 0.98, green: 0.88, blue: 0.54))
+                        .frame(width: 42, height: 42)
+                        .background(.black.opacity(0.66))
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .position(x: leftRail + 38, y: h - safe.bottom - 34)
+
+                if showsAssistPanel {
+                    AssistPanelView(game: game) {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showsAssistPanel = false
+                        }
+                    }
+                    .frame(width: 310)
+                    .position(x: center.x - 120, y: center.y)
+                    .transition(.scale(scale: 0.96).combined(with: .opacity))
+                    .zIndex(10)
+                }
             }
             .onAppear { game.drawForUserIfNeeded() }
         }

@@ -13,6 +13,22 @@ struct WinResult: Identifiable, Equatable {
     let explanation: String
 }
 
+enum TableEventTone {
+    case neutral
+    case discard
+    case draw
+    case call
+    case thinking
+    case win
+}
+
+struct DiscardRecommendation: Identifiable, Hashable {
+    var id: MahjongTile.ID { tile.id }
+    let tile: MahjongTile
+    let score: Int
+    let reason: String
+}
+
 @MainActor
 final class MahjongGameViewModel: ObservableObject {
     @Published var players: [MahjongPlayer] = []
@@ -55,6 +71,29 @@ final class MahjongGameViewModel: ObservableObject {
         let meldLike = count.values.filter { $0 >= 3 }.count
         let estimate = max(0, 6 - pairs - meldLike * 2)
         return "\(estimate)向聴"
+    }
+
+    var eventTone: TableEventTone {
+        if winningResult != nil { return .win }
+        if message.contains("ポン") || message.contains("リーチ") { return .call }
+        if message.contains("考え中") { return .thinking }
+        if message.contains("ツモ") { return .draw }
+        if message.contains("捨て") || message.contains("打牌") { return .discard }
+        return .neutral
+    }
+
+    var assistRecommendations: [DiscardRecommendation] {
+        guard players.indices.contains(0), !players[0].hand.isEmpty else { return [] }
+        return players[0].hand
+            .map { tile in
+                DiscardRecommendation(tile: tile, score: discardScore(for: tile, in: players[0].hand), reason: assistReason(for: tile, in: players[0].hand))
+            }
+            .sorted { lhs, rhs in
+                if lhs.score != rhs.score { return lhs.score > rhs.score }
+                return lhs.tile.sortKey < rhs.tile.sortKey
+            }
+            .prefix(3)
+            .map { $0 }
     }
 
     init() {
@@ -158,6 +197,11 @@ final class MahjongGameViewModel: ObservableObject {
         selectedTileID = nil
         lastTappedTileID = nil
         message = "牌を選んでください。"
+    }
+
+    func selectRecommendation(_ recommendation: DiscardRecommendation) {
+        select(tile: recommendation.tile)
+        message = "\(recommendation.tile.label)を候補にしました。\(recommendation.reason)"
     }
 
     func drawForUserIfNeeded() {
@@ -321,19 +365,32 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func chooseDiscardIndex(for hand: [MahjongTile]) -> Int {
         let ranked = hand.enumerated().map { pair -> (offset: Int, score: Int) in
-            let tile = pair.element
-            var score = 0
-            if tile.suit == .honor { score += 8 }
-            if tile.rank == 1 || tile.rank == 9 { score += 5 }
-            let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
-            if sameCount >= 2 { score -= 9 }
-            if tile.suit != .honor {
-                if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 1 }) { score -= 3 }
-                if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 1 }) { score -= 3 }
-            }
-            return (pair.offset, score)
+            (pair.offset, discardScore(for: pair.element, in: hand))
         }
         return ranked.max(by: { $0.score < $1.score })?.offset ?? hand.indices.randomElement() ?? 0
+    }
+
+    private func discardScore(for tile: MahjongTile, in hand: [MahjongTile]) -> Int {
+        var score = 0
+        if tile.suit == .honor { score += 8 }
+        if tile.rank == 1 || tile.rank == 9 { score += 5 }
+        let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
+        if sameCount >= 2 { score -= 9 }
+        if tile.suit != .honor {
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 1 }) { score -= 3 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 1 }) { score -= 3 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 2 }) { score -= 1 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 2 }) { score -= 1 }
+        }
+        return score
+    }
+
+    private func assistReason(for tile: MahjongTile, in hand: [MahjongTile]) -> String {
+        let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
+        if sameCount >= 2 { return "対子以上なので少し残したい牌です。" }
+        if tile.suit == .honor { return "孤立字牌は序盤の整理候補です。" }
+        if tile.rank == 1 || tile.rank == 9 { return "端牌で横の伸びが少なめです。" }
+        return "周辺のつながりが薄い候補です。"
     }
 
     private func drawTile() -> MahjongTile? {

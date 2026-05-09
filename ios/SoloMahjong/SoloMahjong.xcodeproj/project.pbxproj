@@ -27,6 +27,8 @@
 		A10000000000000000000019 /* MeldAreaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* MeldAreaView.swift */; };
 		A10000000000000000000020 /* GameHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* GameHUDView.swift */; };
 		A10000000000000000000021 /* WinResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* WinResultView.swift */; };
+		A10000000000000000000022 /* TableEventBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* TableEventBannerView.swift */; };
+		A10000000000000000000023 /* AssistPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* AssistPanelView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +53,8 @@
 		A20000000000000000000019 /* MeldAreaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeldAreaView.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* GameHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameHUDView.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* WinResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WinResultView.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* TableEventBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableEventBannerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* AssistPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistPanelView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +131,8 @@
 				A20000000000000000000019 /* MeldAreaView.swift */,
 				A20000000000000000000020 /* GameHUDView.swift */,
 				A20000000000000000000021 /* WinResultView.swift */,
+				A20000000000000000000022 /* TableEventBannerView.swift */,
+				A20000000000000000000023 /* AssistPanelView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -220,6 +226,8 @@
 				A10000000000000000000019 /* MeldAreaView.swift in Sources */,
 				A10000000000000000000020 /* GameHUDView.swift in Sources */,
 				A10000000000000000000021 /* WinResultView.swift in Sources */,
+				A10000000000000000000022 /* TableEventBannerView.swift in Sources */,
+				A10000000000000000000023 /* AssistPanelView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
