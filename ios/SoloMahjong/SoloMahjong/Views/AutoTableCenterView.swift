@@ -23,6 +23,14 @@ struct AutoTableCenterView: View {
                             .stroke(Color(red: 0.80, green: 0.66, blue: 0.36).opacity(0.45), lineWidth: 2)
                     )
 
+                Image("TenbouSticks")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: side * 0.48, height: side * 0.19)
+                    .opacity(0.24)
+                    .position(x: side * 0.50, y: side * 0.22)
+
                 scoreLabel(game.players[safe: 2]?.score ?? 25000)
                     .position(x: side * 0.50, y: side * 0.14)
                 scoreLabel(game.players[safe: 0]?.score ?? 25000)
@@ -31,6 +39,16 @@ struct AutoTableCenterView: View {
                     .position(x: side * 0.15, y: side * 0.50)
                 scoreLabel(game.players[safe: 1]?.score ?? 25000)
                     .position(x: side * 0.85, y: side * 0.50)
+
+                if game.roundState.riichiSticks > 0 {
+                    Image("RiichiStick")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: side * 0.36, height: side * 0.08)
+                        .shadow(color: .black.opacity(0.28), radius: 3, x: 0, y: 1)
+                        .position(x: side * 0.50, y: side * 0.30)
+                }
 
                 centerDisplay
                     .frame(width: centerSize, height: centerSize)

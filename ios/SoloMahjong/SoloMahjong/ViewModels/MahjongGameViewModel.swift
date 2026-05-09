@@ -10,6 +10,7 @@ struct WinResult: Identifiable, Equatable {
     let hanText: String
     let fuText: String
     let scoreText: String
+    let scoreBreakdown: [String]
     let explanation: String
 }
 
@@ -33,6 +34,7 @@ struct DiscardRecommendation: Identifiable, Hashable {
 final class MahjongGameViewModel: ObservableObject {
     @Published var players: [MahjongPlayer] = []
     @Published var wall: [MahjongTile] = []
+    @Published var doraIndicators: [MahjongTile] = []
     @Published var selectedTileID: MahjongTile.ID?
     @Published var currentPlayerIndex: Int = 0
     @Published var message: String = "新しい対局を開始します。"
@@ -47,6 +49,7 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var lastTapDate: Date = .distantPast
 
     var roundTitle: String { roundState.title }
+    var doraTiles: [MahjongTile] { doraIndicators.map(\.doraSuccessor) }
 
     var user: MahjongPlayer { players[0] }
 
@@ -129,6 +132,7 @@ final class MahjongGameViewModel: ObservableObject {
             }
         }
         wall = Self.makeWall().shuffled()
+        doraIndicators = wall.isEmpty ? [] : [wall.removeLast()]
         selectedTileID = nil
         currentPlayerIndex = 0
         message = "配牌しました。牌を選んで捨てましょう。"
@@ -425,7 +429,15 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func log(_ text: String) {
         actionLog.insert(text, at: 0)
-        if actionLog.count > 40 { actionLog.removeLast() }
+        if actionLog.count > 16 { actionLog.removeLast(actionLog.count - 16) }
+    }
+
+    private func countDora(in hand: [MahjongTile]) -> Int {
+        let doraKinds = doraTiles
+        guard !doraKinds.isEmpty else { return 0 }
+        return hand.reduce(0) { total, tile in
+            total + doraKinds.filter { tile.matchesKind($0) }.count
+        }
     }
 
     static func makeWall() -> [MahjongTile] {
@@ -476,6 +488,7 @@ extension MahjongGameViewModel {
         if !yakuman.isEmpty {
             let multiplier = yakuman.count
             let base = dealer ? 48000 : 32000
+            let score = base * multiplier
             return WinResult(
                 winnerName: winnerName,
                 title: multiplier >= 2 ? "ダブル以上役満！" : "役満和了！",
@@ -483,28 +496,45 @@ extension MahjongGameViewModel {
                 yaku: yakuman,
                 hanText: "役満 × \(multiplier)",
                 fuText: "役満は符計算なし",
-                scoreText: "\(base * multiplier)点",
-                explanation: "通常の翻・符ではなく、成立した役満で点数を計算しています。"
+                scoreText: "\(score)点",
+                scoreBreakdown: [
+                    "成立役：\(yakuman.joined(separator: " + "))",
+                    "\(dealer ? "親" : "子")の役満基準点 \(base)点 × \(multiplier)",
+                    "合計 \(score)点。役満は翻・符の通常計算を使いません。"
+                ],
+                explanation: "成立した役満を優先して点数を計算しています。"
             )
         }
 
         var normalYaku: [String] = []
         if sevenPairs { normalYaku.append("七対子") }
         if method == "ツモ" { normalYaku.append("門前清自摸和") }
+        if players.indices.contains(playerIndex), players[playerIndex].isReach { normalYaku.append("リーチ") }
         if normalYaku.isEmpty { normalYaku.append("和了形") }
-        let han = max(1, normalYaku.count)
+        let doraCount = countDora(in: hand)
+        let displayYaku = doraCount > 0 ? normalYaku + ["ドラ\(doraCount)"] : normalYaku
+        let han = max(1, normalYaku.count + doraCount)
         let fu = sevenPairs ? 25 : 30
-        let score = dealer ? 1500 * han : 1000 * han
+        let baseScore = dealer ? 1500 * han : 1000 * han
+        let deposit = roundState.riichiSticks * 1000
+        let score = baseScore + deposit
 
         return WinResult(
             winnerName: winnerName,
             title: "和了！",
             method: method,
-            yaku: normalYaku,
+            yaku: displayYaku,
             hanText: "\(han)翻",
             fuText: "\(fu)符（練習用概算）",
             scoreText: "約\(score)点",
-            explanation: "通常役は練習用の簡易計算です。役満は個別判定を優先しています。"
+            scoreBreakdown: [
+                "成立役：\(normalYaku.joined(separator: " + "))",
+                doraCount > 0 ? "ドラ：\(doraIndicators.map(\.label).joined(separator: "・"))表示なので、ドラは\(doraTiles.map(\.label).joined(separator: "・"))。手牌に\(doraCount)枚あります。" : "ドラ：\(doraIndicators.map(\.label).joined(separator: "・"))表示。今回は手牌にドラはありません。",
+                "\(han)翻 / \(fu)符として練習用に概算",
+                "\(dealer ? "親" : "子")の基本点 約\(baseScore)点" + (deposit > 0 ? " + 供託\(deposit)点" : ""),
+                "合計 約\(score)点"
+            ],
+            explanation: "役を名前だけで終わらせず、翻・符・供託まで追えるようにした練習用の簡易計算です。"
         )
     }
 

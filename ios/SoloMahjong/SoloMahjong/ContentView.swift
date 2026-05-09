@@ -71,6 +71,19 @@ private struct StartScreen: View {
 
     private var introBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
+            Image("StartHeroMahjong")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(maxWidth: 430)
+                .frame(height: 184)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(.white.opacity(0.12), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.38), radius: 18, x: 0, y: 10)
+
             Text("SoloMahjong")
                 .font(.system(size: 38, weight: .black, design: .rounded))
                 .foregroundStyle(.white)

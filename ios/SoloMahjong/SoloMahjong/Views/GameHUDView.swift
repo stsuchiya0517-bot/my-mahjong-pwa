@@ -55,17 +55,15 @@ struct GameHUDView: View {
                 Text(game.roundState.detailTitle)
                     .font(.system(size: compact ? 19 : 23, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Text("供託\(game.roundState.riichiSticks)")
-                    .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(.yellow)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(.black.opacity(0.36))
-                    .clipShape(Capsule())
+                riichiStickBadge
             }
             Text("山 \(game.wall.count)枚  巡目 \(game.turnNumber)")
                 .font(.system(size: compact ? 10 : 12, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.72))
+            if let indicator = game.doraIndicators.first, let dora = game.doraTiles.first {
+                doraBadge(indicator: indicator, dora: dora)
+                    .padding(.top, 2)
+            }
         }
     }
 
@@ -85,6 +83,44 @@ struct GameHUDView: View {
                 }
             }
         }
+    }
+
+    private var riichiStickBadge: some View {
+        HStack(spacing: 3) {
+            Image("RiichiStick")
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 30, height: 10)
+                .clipShape(Capsule())
+            Text("\(game.roundState.riichiSticks)")
+                .font(.system(size: 9, weight: .black, design: .rounded))
+                .foregroundStyle(.yellow)
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(.black.opacity(0.36))
+        .clipShape(Capsule())
+        .accessibilityLabel("供託\(game.roundState.riichiSticks)")
+    }
+
+    private func doraBadge(indicator: MahjongTile, dora: MahjongTile) -> some View {
+        HStack(spacing: 5) {
+            Text("ドラ表示")
+                .font(.system(size: 8, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.70))
+            TileView(tile: indicator, isCompact: true, displayStyle: .river)
+                .scaleEffect(0.72)
+                .frame(width: 21, height: 27)
+            Text("→ \(dora.label)")
+                .font(.system(size: 10, weight: .black, design: .rounded))
+                .foregroundStyle(Color(red: 0.98, green: 0.86, blue: 0.28))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(.black.opacity(0.34))
+        .clipShape(Capsule())
+        .accessibilityLabel("ドラ表示牌 \(indicator.label)、ドラ \(dora.label)")
     }
 
     @ViewBuilder

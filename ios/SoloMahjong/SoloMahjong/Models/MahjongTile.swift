@@ -76,6 +76,22 @@ struct MahjongTile: Identifiable, Hashable, Codable {
     var sortKey: String {
         "\(suit.sortOrder)-\(rank)-\(copy)"
     }
+
+    var doraSuccessor: MahjongTile {
+        switch suit {
+        case .man, .pin, .sou:
+            return MahjongTile(suit: suit, rank: rank == 9 ? 1 : rank + 1, copy: 0)
+        case .honor:
+            if rank <= 4 {
+                return MahjongTile(suit: .honor, rank: rank == 4 ? 1 : rank + 1, copy: 0)
+            }
+            return MahjongTile(suit: .honor, rank: rank == 7 ? 5 : rank + 1, copy: 0)
+        }
+    }
+
+    func matchesKind(_ other: MahjongTile) -> Bool {
+        suit == other.suit && rank == other.rank
+    }
 }
 
 extension Array where Element == MahjongTile {

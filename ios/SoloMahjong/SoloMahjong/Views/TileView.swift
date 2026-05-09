@@ -134,7 +134,11 @@ private struct TileFaceView: View {
         case .sou:
             GeneratedTileMark(name: "Sou\(tile.rank)Mark", dense: dense)
         case .honor:
-            GeneratedTileMark(name: "Honor\(tile.rank)Mark", dense: dense)
+            if tile.rank == 5 {
+                EmptyView()
+            } else {
+                GeneratedTileMark(name: "Honor\(tile.rank)Mark", dense: dense)
+            }
         }
     }
 }
