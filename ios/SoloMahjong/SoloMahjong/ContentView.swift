@@ -18,9 +18,9 @@ struct ContentView: View {
                 )
             } else {
                 StartScreen(
-                    onStart: {
+                    onStart: { mode in
                         withAnimation(.easeInOut(duration: 0.25)) {
-                            game.startMatch()
+                            game.startMatch(mode: mode)
                             hasStarted = true
                         }
                     },
@@ -43,6 +43,66 @@ struct ContentView: View {
                 game.isBusy = false
                 game.advanceToNextRound()
             }
+        }
+        .sheet(item: $game.matchResult) { result in
+            MatchResultView(result: result) {
+                game.matchResult = nil
+                hasStarted = false
+            }
+        }
+    }
+}
+
+private struct MatchResultView: View {
+    let result: MatchResult
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack {
+            FeltBackground()
+
+            VStack(spacing: 18) {
+                Text("\(result.modeName) 終了")
+                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .foregroundStyle(.yellow)
+
+                VStack(spacing: 9) {
+                    ForEach(result.standings) { standing in
+                        HStack(spacing: 12) {
+                            Text("\(standing.rank)位")
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundStyle(standing.rank == 1 ? .yellow : .white.opacity(0.72))
+                                .frame(width: 46, alignment: .leading)
+                            Text(standing.playerName)
+                                .font(.system(size: 17, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Text("\(standing.score)点")
+                                .font(.system(size: 17, weight: .black, design: .monospaced))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(12)
+                        .background(standing.rank == 1 ? Color.yellow.opacity(0.18) : Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+                .frame(maxWidth: 440)
+
+                Text("最終持ち点で順位を決定しました。実戦ではここにウマ・オカを加えるルールもあります。")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+
+                Button(action: onClose) {
+                    Text("ホームへ")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .frame(width: 260, height: 56)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+            }
+            .padding()
         }
     }
 }
@@ -87,8 +147,9 @@ private struct RoundNoticeView: View {
 }
 
 private struct StartScreen: View {
-    let onStart: () -> Void
+    let onStart: (MatchMode) -> Void
     let onHowToPlay: () -> Void
+    @State private var selectedMode: MatchMode = .eastSouth
 
     var body: some View {
         GeometryReader { geo in
@@ -103,13 +164,13 @@ private struct StartScreen: View {
                     if isLandscape {
                         HStack(spacing: 34) {
                             introBlock(width: min(430, (geo.size.width - 120) * 0.56), compact: true)
-                            menuBlock(width: 280)
+                            menuBlock(width: 280, mode: selectedMode)
                         }
                         .frame(maxWidth: .infinity, minHeight: geo.size.height - safe.top - safe.bottom, alignment: .center)
                     } else {
                         VStack(spacing: 22) {
                             introBlock(width: contentWidth, compact: geo.size.height < 760)
-                            menuBlock(width: contentWidth)
+                            menuBlock(width: contentWidth, mode: selectedMode)
                         }
                         .frame(maxWidth: .infinity, minHeight: geo.size.height - safe.top - safe.bottom, alignment: .center)
                     }
@@ -154,9 +215,19 @@ private struct StartScreen: View {
         .frame(width: width, alignment: .leading)
     }
 
-    private func menuBlock(width: CGFloat) -> some View {
+    private func menuBlock(width: CGFloat, mode: MatchMode) -> some View {
         VStack(spacing: 13) {
-            Button(action: onStart) {
+            Picker("試合形式", selection: $selectedMode) {
+                ForEach(MatchMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .tint(.green)
+
+            Button {
+                onStart(mode)
+            } label: {
                 Text("対局を始める")
                     .font(.system(size: 19, weight: .black, design: .rounded))
                     .frame(maxWidth: .infinity)

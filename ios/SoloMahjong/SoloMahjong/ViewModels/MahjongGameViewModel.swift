@@ -21,6 +21,27 @@ struct RoundNotice: Identifiable, Equatable {
     let detail: String
 }
 
+enum MatchMode: String, CaseIterable, Identifiable {
+    case eastOnly = "東風戦"
+    case eastSouth = "半荘戦"
+
+    var id: String { rawValue }
+    var finalWind: RoundWind { self == .eastOnly ? .east : .south }
+}
+
+struct MatchStanding: Identifiable, Equatable {
+    let id = UUID()
+    let rank: Int
+    let playerName: String
+    let score: Int
+}
+
+struct MatchResult: Identifiable, Equatable {
+    let id = UUID()
+    let modeName: String
+    let standings: [MatchStanding]
+}
+
 enum TableEventTone {
     case neutral
     case discard
@@ -68,6 +89,8 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var actionLog: [String] = []
     @Published var winningResult: WinResult?
     @Published var roundNotice: RoundNotice?
+    @Published var matchResult: MatchResult?
+    @Published var matchMode: MatchMode = .eastSouth
     @Published var lastTappedTileID: MahjongTile.ID?
     @Published var lastTapDate: Date = .distantPast
     @Published var pendingUserCall: PendingUserCall?
@@ -166,8 +189,12 @@ final class MahjongGameViewModel: ObservableObject {
         startNewGame()
     }
 
-    func startMatch() {
+    func startMatch(mode: MatchMode? = nil) {
+        if let mode {
+            matchMode = mode
+        }
         roundState = MahjongRoundState()
+        matchResult = nil
         startRound(resetScores: true)
     }
 
@@ -176,6 +203,10 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     func advanceToNextRound() {
+        if isFinalRound(roundState) {
+            matchResult = makeMatchResult()
+            return
+        }
         roundState.advanceDealer()
         startRound(resetScores: false)
     }
@@ -712,9 +743,72 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func applyWinScore(playerIndex: Int, method: String) {
         guard players.indices.contains(playerIndex) else { return }
-        let gain = method == "ツモ" ? 2000 + roundState.riichiSticks * 1000 : 1000
-        players[playerIndex].score += gain
+        let base = estimatedWinPoint(for: players[playerIndex].hand, playerIndex: playerIndex, method: method)
+        let honbaBonus = roundState.honba * 300
+        let deposit = roundState.riichiSticks * 1000
+
+        if method == "ツモ" {
+            var gain = deposit
+            for index in players.indices where index != playerIndex {
+                let payment = max(500, base / 3) + roundState.honba * 100
+                players[index].score -= payment
+                gain += payment
+            }
+            players[playerIndex].score += gain
+        } else if let fromIndex = lastDiscardPlayerIndex, players.indices.contains(fromIndex), fromIndex != playerIndex {
+            let payment = base + honbaBonus + deposit
+            players[fromIndex].score -= payment
+            players[playerIndex].score += payment
+        } else {
+            players[playerIndex].score += base + honbaBonus + deposit
+        }
+
+        roundState.honba = players[playerIndex].isDealer ? roundState.honba + 1 : 0
         roundState.riichiSticks = 0
+    }
+
+    private func estimatedWinPoint(for hand: [MahjongTile], playerIndex: Int, method: String) -> Int {
+        let counts = tileCounts(hand)
+        let yakumanCount = [
+            isKokushi(counts),
+            isSuuAnkou(counts),
+            isDaisangen(counts),
+            isDaisuushi(counts),
+            isShousuushi(counts),
+            isTsuuiisou(hand),
+            isChinroutou(hand),
+            isRyuuiisou(hand),
+            isChuuren(hand)
+        ].filter { $0 }.count
+        let dealer = players.indices.contains(playerIndex) && players[playerIndex].isDealer
+        if yakumanCount > 0 {
+            return (dealer ? 48000 : 32000) * yakumanCount
+        }
+
+        var han = 0
+        if isSevenPairs(counts) { han += 1 }
+        if method == "ツモ" { han += 1 }
+        if players.indices.contains(playerIndex), players[playerIndex].isReach { han += 1 }
+        han += countDora(in: hand)
+        han = max(1, han)
+        return (dealer ? 1500 : 1000) * han
+    }
+
+    private func isFinalRound(_ state: MahjongRoundState) -> Bool {
+        state.wind == matchMode.finalWind && state.handNumber >= 4
+    }
+
+    private func makeMatchResult() -> MatchResult {
+        let ranked = players
+            .sorted { lhs, rhs in
+                if lhs.score != rhs.score { return lhs.score > rhs.score }
+                return lhs.name < rhs.name
+            }
+            .enumerated()
+            .map { offset, player in
+                MatchStanding(rank: offset + 1, playerName: player.name, score: player.score)
+            }
+        return MatchResult(modeName: matchMode.rawValue, standings: ranked)
     }
 
     private func log(_ text: String) {
@@ -874,9 +968,10 @@ extension MahjongGameViewModel {
         let displayYaku = doraCount > 0 ? normalYaku + ["ドラ\(doraCount)"] : normalYaku
         let han = max(1, normalYaku.count + doraCount)
         let fu = sevenPairs ? 25 : 30
-        let baseScore = dealer ? 1500 * han : 1000 * han
+        let baseScore = estimatedWinPoint(for: hand, playerIndex: playerIndex, method: method)
+        let honbaBonus = roundState.honba * (method == "ツモ" ? 300 : 300)
         let deposit = roundState.riichiSticks * 1000
-        let score = baseScore + deposit
+        let score = baseScore + honbaBonus + deposit
 
         return WinResult(
             winnerName: winnerName,
@@ -890,7 +985,7 @@ extension MahjongGameViewModel {
                 "成立役：\(normalYaku.joined(separator: " + "))",
                 doraCount > 0 ? "ドラ：\(doraIndicators.map(\.label).joined(separator: "・"))表示なので、ドラは\(doraTiles.map(\.label).joined(separator: "・"))。手牌に\(doraCount)枚あります。" : "ドラ：\(doraIndicators.map(\.label).joined(separator: "・"))表示。今回は手牌にドラはありません。",
                 "\(han)翻 / \(fu)符として練習用に概算",
-                "\(dealer ? "親" : "子")の基本点 約\(baseScore)点" + (deposit > 0 ? " + 供託\(deposit)点" : ""),
+                "\(dealer ? "親" : "子")の基本点 約\(baseScore)点" + (honbaBonus > 0 ? " + 本場\(honbaBonus)点" : "") + (deposit > 0 ? " + 供託\(deposit)点" : ""),
                 "合計 約\(score)点"
             ],
             explanation: "役を名前だけで終わらせず、翻・符・供託まで追えるようにした練習用の簡易計算です。"
