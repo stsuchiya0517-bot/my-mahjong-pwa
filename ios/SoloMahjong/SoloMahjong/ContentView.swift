@@ -37,6 +37,52 @@ struct ContentView: View {
                 game.advanceToNextRound()
             }
         }
+        .sheet(item: $game.roundNotice) { notice in
+            RoundNoticeView(notice: notice) {
+                game.roundNotice = nil
+                game.isBusy = false
+                game.advanceToNextRound()
+            }
+        }
+    }
+}
+
+private struct RoundNoticeView: View {
+    let notice: RoundNotice
+    let onNext: () -> Void
+
+    var body: some View {
+        ZStack {
+            FeltBackground()
+
+            VStack(spacing: 18) {
+                Text(notice.title)
+                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .foregroundStyle(.yellow)
+
+                Text(notice.body)
+                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text(notice.detail)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+                    .padding(16)
+                    .background(.black.opacity(0.30))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+                Button(action: onNext) {
+                    Text("次局へ")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .frame(width: 260, height: 56)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+            }
+            .padding()
+        }
     }
 }
 

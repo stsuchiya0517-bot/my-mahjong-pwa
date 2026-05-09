@@ -14,6 +14,13 @@ struct WinResult: Identifiable, Equatable {
     let explanation: String
 }
 
+struct RoundNotice: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let body: String
+    let detail: String
+}
+
 enum TableEventTone {
     case neutral
     case discard
@@ -60,10 +67,14 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var isBusy: Bool = false
     @Published var actionLog: [String] = []
     @Published var winningResult: WinResult?
+    @Published var roundNotice: RoundNotice?
     @Published var lastTappedTileID: MahjongTile.ID?
     @Published var lastTapDate: Date = .distantPast
     @Published var pendingUserCall: PendingUserCall?
     @Published var isDeclaringReach: Bool = false
+    @Published var forbiddenDiscardKeys: Set<Int> = []
+    @Published var isAfterUserCall: Bool = false
+    @Published var forcedDiscardTileID: MahjongTile.ID?
 
     var roundTitle: String { roundState.title }
     var doraTiles: [MahjongTile] { doraIndicators.map(\.doraSuccessor) }
@@ -76,7 +87,8 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     var canDiscard: Bool {
-        selectedTile != nil && currentPlayerIndex == 0 && !isBusy && winningResult == nil
+        guard let selectedTile else { return false }
+        return currentPlayerIndex == 0 && !isBusy && winningResult == nil && canSelectForDiscard(selectedTile)
     }
 
     var canReach: Bool {
@@ -86,7 +98,15 @@ final class MahjongGameViewModel: ObservableObject {
 
     var canClosedKan: Bool {
         guard players.indices.contains(0), currentPlayerIndex == 0, !isBusy, pendingUserCall == nil else { return false }
-        return firstClosedKanTiles() != nil
+        return !players[0].isReach && firstClosedKanTiles() != nil
+    }
+
+    func canSelectForDiscard(_ tile: MahjongTile) -> Bool {
+        guard currentPlayerIndex == 0, !isBusy, pendingUserCall == nil, winningResult == nil else { return false }
+        if let forcedDiscardTileID {
+            return tile.id == forcedDiscardTileID
+        }
+        return !forbiddenDiscardKeys.contains(tileKey(tile))
     }
 
     var canTsumoWin: Bool {
@@ -166,8 +186,12 @@ final class MahjongGameViewModel: ObservableObject {
         lastDiscard = nil
         lastDiscardPlayerIndex = nil
         winningResult = nil
+        roundNotice = nil
         pendingUserCall = nil
         isDeclaringReach = false
+        forbiddenDiscardKeys.removeAll()
+        isAfterUserCall = false
+        forcedDiscardTileID = nil
         turnNumber = 1
         lastTappedTileID = nil
         lastTapDate = .distantPast
@@ -177,7 +201,10 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     func select(tile: MahjongTile) {
-        guard currentPlayerIndex == 0, !isBusy, winningResult == nil else { return }
+        guard canSelectForDiscard(tile) else {
+            message = "この牌は今は捨てられません。鳴き直後の食い替え、またはリーチ後の手牌変更は禁止です。"
+            return
+        }
         withAnimation(.spring(response: 0.22, dampingFraction: 0.74)) {
             selectedTileID = tile.id
         }
@@ -185,7 +212,10 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     func handleHandTap(_ tile: MahjongTile) {
-        guard currentPlayerIndex == 0, !isBusy, winningResult == nil else { return }
+        guard canSelectForDiscard(tile) else {
+            message = "この牌は捨てられません。禁止牌は暗く表示しています。"
+            return
+        }
         let now = Date()
         if lastTappedTileID == tile.id, now.timeIntervalSince(lastTapDate) < 0.34 {
             selectedTileID = tile.id
@@ -227,6 +257,9 @@ final class MahjongGameViewModel: ObservableObject {
             lastDiscardPlayerIndex = 0
             self.selectedTileID = nil
             lastTappedTileID = nil
+            forbiddenDiscardKeys.removeAll()
+            isAfterUserCall = false
+            forcedDiscardTileID = nil
             log("あなた：\(tile.label)を打牌")
         }
 
@@ -255,6 +288,8 @@ final class MahjongGameViewModel: ObservableObject {
             players[0].melds.append(MahjongMeld(type: .kan, tiles: kanTiles, calledTile: nil, fromPlayerIndex: nil))
             selectedTileID = nil
             lastTappedTileID = nil
+            forbiddenDiscardKeys.removeAll()
+            isAfterUserCall = true
         }
         message = "\(kanTiles[0].label)を暗カンしました。嶺上牌をツモります。"
         log("あなた：\(kanTiles[0].label)を暗カン")
@@ -298,6 +333,8 @@ final class MahjongGameViewModel: ObservableObject {
             players[fromIndex].discards.removeAll { $0.id == called.id }
             let meldTiles = (consumed + [called]).sortedForHand()
             players[0].melds.append(MahjongMeld(type: meldType, tiles: meldTiles, calledTile: called, fromPlayerIndex: fromIndex))
+            forbiddenDiscardKeys = forbiddenKeysAfterCall(action: action, called: called, consumed: consumed)
+            isAfterUserCall = true
             self.pendingUserCall = nil
             currentPlayerIndex = 0
             selectedTileID = nil
@@ -305,7 +342,8 @@ final class MahjongGameViewModel: ObservableObject {
             isBusy = false
         }
 
-        message = "\(called.label)を\(meldType.rawValue)しました。次に捨てる牌を選んでください。"
+        let ruleNote = forbiddenDiscardKeys.isEmpty ? "" : " 食い替え禁止の牌は暗くしています。"
+        message = "\(called.label)を\(meldType.rawValue)しました。次に捨てる牌を選んでください。\(ruleNote)"
         log("あなた：\(called.label)を\(meldType.rawValue)")
         if meldType == .kan, let rinshan = drawTile() {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
@@ -321,6 +359,8 @@ final class MahjongGameViewModel: ObservableObject {
         guard let pendingUserCall else { return }
         let next = pendingUserCall.fromPlayerIndex + 1
         self.pendingUserCall = nil
+        forbiddenDiscardKeys.removeAll()
+        isAfterUserCall = false
         if next <= 3 {
             continueCPU(from: next)
         } else {
@@ -350,7 +390,13 @@ final class MahjongGameViewModel: ObservableObject {
                 players[0].hand.append(drawn)
                 players[0].hand = players[0].hand.sortedForHand()
             }
-            message = "\(drawn.label)をツモりました。捨てる牌を選んでください。"
+            if players[0].isReach {
+                forcedDiscardTileID = drawn.id
+                selectedTileID = drawn.id
+                message = "リーチ後なので手を変えられません。ツモった\(drawn.label)だけ捨てられます。"
+            } else {
+                message = "\(drawn.label)をツモりました。捨てる牌を選んでください。"
+            }
             log("あなた：\(drawn.label)をツモ")
         }
     }
@@ -513,6 +559,7 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func offerUserCallIfAvailable(on discardedTile: MahjongTile?, discardedBy fromPlayerIndex: Int) {
         guard let discardedTile, fromPlayerIndex != 0, players.indices.contains(0), winningResult == nil else { return }
+        guard !players[0].isReach else { return }
         var actions: [UserCallAction] = []
         if matchingTiles(for: discardedTile, count: 2) != nil { actions.append(.pon) }
         if matchingTiles(for: discardedTile, count: 3) != nil { actions.append(.kan) }
@@ -555,6 +602,19 @@ final class MahjongGameViewModel: ObservableObject {
         guard players.indices.contains(0) else { return nil }
         let grouped = Dictionary(grouping: players[0].hand, by: { tileKey($0) })
         return grouped.values.first(where: { $0.count >= 4 }).map { Array($0.prefix(4)) }
+    }
+
+    private func forbiddenKeysAfterCall(action: UserCallAction, called: MahjongTile, consumed: [MahjongTile]) -> Set<Int> {
+        switch action {
+        case .kan:
+            return []
+        case .pon:
+            // ポン直後に同じ牌を切るのは食い替えとして禁止扱いにします。
+            return [tileKey(called)]
+        case .chi:
+            // チー直後は、鳴いた牌と構成牌をすぐ切れないようにして順子の食い替えを防ぎます。
+            return Set((consumed + [called]).map { tileKey($0) })
+        }
     }
 
     private func estimatedShanten(for hand: [MahjongTile]) -> Int {
@@ -612,10 +672,12 @@ final class MahjongGameViewModel: ObservableObject {
         guard !wall.isEmpty else {
             message = "流局です。次局へ進みます。"
             roundState.honba += 1
-            Task {
-                try? await Task.sleep(nanoseconds: 700_000_000)
-                advanceToNextRound()
-            }
+            isBusy = true
+            roundNotice = RoundNotice(
+                title: "流局",
+                body: "山がなくなりました。",
+                detail: "誰も和了できなかったため本場が1つ増えます。次局へ進んで、配牌からやり直します。"
+            )
             return nil
         }
         return wall.removeLast()

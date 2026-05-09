@@ -14,13 +14,28 @@ struct PlayerHandView: View {
 
             HStack(alignment: .bottom, spacing: 1) {
                 ForEach(hand) { tile in
+                    let canDiscard = game.canSelectForDiscard(tile)
                     TileView(tile: tile, isSelected: game.selectedTileID == tile.id, displayStyle: tileStyle)
                         .scaleEffect(scale, anchor: .bottom)
                         .frame(width: width, height: height + 8)
+                        .opacity(canDiscard ? 1 : 0.42)
+                        .brightness(canDiscard ? 0 : -0.18)
+                        .saturation(canDiscard ? 1 : 0.30)
+                        .overlay {
+                            if !canDiscard {
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill(.black.opacity(0.24))
+                                    .scaleEffect(scale, anchor: .bottom)
+                            }
+                        }
+                        .offset(y: game.isAfterUserCall && canDiscard ? -3 : 0)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            game.handleHandTap(tile)
+                            if canDiscard {
+                                game.handleHandTap(tile)
+                            }
                         }
+                        .accessibilityHidden(!canDiscard)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height, alignment: .center)

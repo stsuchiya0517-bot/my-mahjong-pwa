@@ -162,10 +162,14 @@ private struct WanFace: View {
     let rank: Int
     let dense: Bool
 
+    private var kanji: String {
+        ["一", "二", "三", "四", "五", "六", "七", "八", "九"][max(0, min(rank - 1, 8))]
+    }
+
     var body: some View {
         VStack(spacing: dense ? -1 : 1) {
-            Text("\(rank)")
-                .font(.system(size: dense ? 16 : 23, weight: .black, design: .serif))
+            Text(kanji)
+                .font(.system(size: dense ? 14.5 : 21, weight: .black, design: .serif))
                 .foregroundStyle(Color.black.opacity(0.92))
                 .shadow(color: .white.opacity(0.55), radius: 0.2, x: 0, y: 0.4)
 
