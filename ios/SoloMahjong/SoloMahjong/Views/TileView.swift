@@ -269,70 +269,95 @@ private struct SouFace: View {
         if rank == 1 {
             OneSouFace(dense: dense)
         } else {
-        GeometryReader { geo in
-            ZStack {
-                ForEach(Array(layout(for: rank).enumerated()), id: \.offset) { index, point in
-                    BambooPip(color: bambooColor(index: index, rank: rank), dense: dense)
-                        .position(x: geo.size.width * point.x, y: geo.size.height * point.y)
+            GeometryReader { geo in
+                ZStack {
+                    ForEach(Array(layout(for: rank).enumerated()), id: \.offset) { index, point in
+                        RealBambooMark(color: bambooColor(index: index, rank: rank), dense: dense)
+                            .position(x: geo.size.width * point.x, y: geo.size.height * point.y)
+                    }
                 }
             }
-        }
         }
     }
 
     private func bambooColor(index: Int, rank: Int) -> BambooColor {
-        if rank == 1 { return .green }
-        if rank == 8 { return [ .green, .red, .green, .green, .red, .green, .green, .green ][index] }
-        if rank == 6 { return [ .green, .green, .red, .red, .green, .green ][index] }
-        return index % 3 == 1 ? .red : .green
+        switch rank {
+        case 5:
+            return index == 2 ? .red : .green
+        case 6:
+            return [ .green, .green, .red, .red, .green, .green ][index]
+        case 7:
+            return index == 2 ? .red : .green
+        case 8:
+            return [ .green, .red, .green, .green, .red, .green, .green, .green ][index]
+        case 9:
+            return [ .green, .red, .green, .green, .green, .green, .green, .red, .green ][index]
+        default:
+            return .green
+        }
     }
 }
 
 private enum BambooColor { case green, red, blue }
 
-private struct BambooPip: View {
+private struct RealBambooMark: View {
     let color: BambooColor
     let dense: Bool
 
     var body: some View {
-        let h: CGFloat = dense ? 10.0 : 14.8
-        let w: CGFloat = dense ? 3.5 : 5.0
+        let h: CGFloat = dense ? 10.8 : 16.2
+        let w: CGFloat = dense ? 4.6 : 6.4
         let main: Color = {
             switch color {
-            case .green: return Color(red: 0.03, green: 0.43, blue: 0.15)
-            case .red: return Color(red: 0.74, green: 0.05, blue: 0.06)
-            case .blue: return Color(red: 0.14, green: 0.31, blue: 0.68)
+            case .green: return Color(red: 0.00, green: 0.38, blue: 0.13)
+            case .red: return Color(red: 0.70, green: 0.035, blue: 0.045)
+            case .blue: return Color(red: 0.08, green: 0.24, blue: 0.58)
             }
         }()
 
         return ZStack {
-            VStack(spacing: dense ? 0.8 : 1.1) {
-                ForEach(0..<3, id: \.self) { segment in
+            RoundedRectangle(cornerRadius: w * 0.42, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [main.opacity(0.78), main, main.opacity(0.94)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: w, height: h)
+                .overlay(alignment: .leading) {
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [main.opacity(0.92), main, main.opacity(0.72)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: w, height: h / 3.7)
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.white.opacity(segment == 1 ? 0.24 : 0.14), lineWidth: 0.35)
-                        )
+                        .fill(.white.opacity(0.22))
+                        .frame(width: w * 0.22, height: h * 0.80)
+                        .padding(.leading, w * 0.18)
                 }
+
+            ForEach([-0.30, 0.0, 0.30], id: \.self) { offset in
+                BambooNode(width: w * 1.18, dense: dense)
+                    .offset(y: h * offset)
             }
+
             Capsule()
-                .fill(Color(red: 0.88, green: 0.84, blue: 0.62))
-                .frame(width: w * 1.32, height: 0.72)
-                .offset(y: -h * 0.17)
-            Capsule()
-                .fill(Color(red: 0.88, green: 0.84, blue: 0.62))
-                .frame(width: w * 1.32, height: 0.72)
-                .offset(y: h * 0.17)
+                .fill(Color.black.opacity(0.18))
+                .frame(width: w * 0.40, height: h * 0.82)
+                .offset(x: w * 0.34)
         }
-        .shadow(color: .black.opacity(0.13), radius: 0.6, x: 0, y: 0.5)
+        .shadow(color: .black.opacity(0.16), radius: 0.7, x: 0, y: 0.55)
+    }
+}
+
+private struct BambooNode: View {
+    let width: CGFloat
+    let dense: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(Color(red: 0.91, green: 0.86, blue: 0.63))
+            .frame(width: width, height: dense ? 0.86 : 1.05)
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.20), lineWidth: dense ? 0.25 : 0.35)
+            )
     }
 }
 
@@ -340,25 +365,68 @@ private struct OneSouFace: View {
     let dense: Bool
 
     var body: some View {
-        let size: CGFloat = dense ? 18 : 27
+        let size: CGFloat = dense ? 18.5 : 28
         ZStack {
-            ForEach(0..<6, id: \.self) { index in
-                Capsule()
-                    .fill(index.isMultiple(of: 2) ? Color(red: 0.05, green: 0.42, blue: 0.15) : Color(red: 0.72, green: 0.06, blue: 0.06))
-                    .frame(width: dense ? 2.8 : 4.0, height: dense ? 9 : 13)
-                    .offset(y: dense ? -4 : -6)
-                    .rotationEffect(.degrees(Double(index) * 30 - 75))
+            PeacockTail(dense: dense)
+                .offset(y: -size * 0.12)
+
+            Path { path in
+                path.move(to: CGPoint(x: size * 0.42, y: size * 0.30))
+                path.addQuadCurve(to: CGPoint(x: size * 0.66, y: size * 0.42), control: CGPoint(x: size * 0.60, y: size * 0.24))
+                path.addQuadCurve(to: CGPoint(x: size * 0.56, y: size * 0.74), control: CGPoint(x: size * 0.72, y: size * 0.64))
+                path.addQuadCurve(to: CGPoint(x: size * 0.30, y: size * 0.64), control: CGPoint(x: size * 0.36, y: size * 0.76))
+                path.addQuadCurve(to: CGPoint(x: size * 0.42, y: size * 0.30), control: CGPoint(x: size * 0.25, y: size * 0.42))
             }
+            .fill(Color(red: 0.00, green: 0.36, blue: 0.13))
+            .overlay(
+                Path { path in
+                    path.move(to: CGPoint(x: size * 0.42, y: size * 0.30))
+                    path.addQuadCurve(to: CGPoint(x: size * 0.66, y: size * 0.42), control: CGPoint(x: size * 0.60, y: size * 0.24))
+                    path.addQuadCurve(to: CGPoint(x: size * 0.56, y: size * 0.74), control: CGPoint(x: size * 0.72, y: size * 0.64))
+                    path.addQuadCurve(to: CGPoint(x: size * 0.30, y: size * 0.64), control: CGPoint(x: size * 0.36, y: size * 0.76))
+                    path.addQuadCurve(to: CGPoint(x: size * 0.42, y: size * 0.30), control: CGPoint(x: size * 0.25, y: size * 0.42))
+                }
+                .stroke(Color.black.opacity(0.62), lineWidth: dense ? 0.7 : 1.0)
+            )
+
             Circle()
-                .fill(Color(red: 0.05, green: 0.42, blue: 0.15))
-                .frame(width: size * 0.44, height: size * 0.44)
+                .fill(Color(red: 0.72, green: 0.04, blue: 0.04))
+                .frame(width: size * 0.15, height: size * 0.15)
+                .position(x: size * 0.49, y: size * 0.45)
+
             Circle()
-                .stroke(Color.black.opacity(0.78), lineWidth: dense ? 0.9 : 1.2)
-                .frame(width: size * 0.60, height: size * 0.60)
-            Circle()
-                .fill(Color(red: 0.72, green: 0.06, blue: 0.06))
-                .frame(width: size * 0.16, height: size * 0.16)
-                .offset(y: size * 0.05)
+                .fill(Color.black.opacity(0.84))
+                .frame(width: size * 0.055, height: size * 0.055)
+                .position(x: size * 0.58, y: size * 0.40)
+
+            Capsule()
+                .fill(Color(red: 0.72, green: 0.04, blue: 0.04))
+                .frame(width: size * 0.17, height: size * 0.05)
+                .rotationEffect(.degrees(-18))
+                .position(x: size * 0.69, y: size * 0.38)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+private struct PeacockTail: View {
+    let dense: Bool
+
+    var body: some View {
+        let size: CGFloat = dense ? 18.5 : 28
+        ZStack {
+            ForEach(0..<7, id: \.self) { index in
+                let angle = Double(index) * 18 - 54
+                Capsule()
+                    .fill(index == 3 ? Color(red: 0.70, green: 0.04, blue: 0.04) : Color(red: 0.00, green: 0.38, blue: 0.13))
+                    .frame(width: dense ? 2.8 : 4.2, height: dense ? 10.0 : 15.0)
+                    .overlay(
+                        Capsule()
+                            .stroke(Color(red: 0.90, green: 0.84, blue: 0.58).opacity(0.55), lineWidth: dense ? 0.35 : 0.5)
+                    )
+                    .offset(y: -size * 0.18)
+                    .rotationEffect(.degrees(angle))
+            }
         }
         .frame(width: size, height: size)
     }
