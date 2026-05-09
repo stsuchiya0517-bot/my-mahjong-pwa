@@ -58,12 +58,6 @@ struct LandscapeGameBoardView: View {
                     .frame(width: min(h * 0.34, 150), height: min(h * 0.34, 150))
                     .position(center)
 
-                TableEventBannerView(message: game.message, tone: game.eventTone)
-                    .id(game.message)
-                    .frame(width: min(boardWidth * 0.42, 310))
-                    .position(x: center.x, y: max(safe.top + 70, center.y - 156))
-                    .animation(.spring(response: 0.26, dampingFraction: 0.82), value: game.message)
-
                 RiverView(tiles: game.players[safe: 2]?.discards ?? [], reachDiscardID: game.players[safe: 2]?.reachDiscardID, seat: .top)
                     .frame(width: 220, height: 70)
                     .position(x: center.x, y: center.y - 124)

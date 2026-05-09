@@ -47,36 +47,42 @@ private struct StartScreen: View {
     var body: some View {
         GeometryReader { geo in
             let isLandscape = geo.size.width > geo.size.height
+            let safe = geo.safeAreaInsets
+            let contentWidth = min(geo.size.width - 44, 430)
 
             ZStack {
                 FeltBackground()
 
-                Group {
+                ScrollView(.vertical, showsIndicators: false) {
                     if isLandscape {
                         HStack(spacing: 34) {
-                            introBlock
-                            menuBlock
+                            introBlock(width: min(430, (geo.size.width - 120) * 0.56), compact: true)
+                            menuBlock(width: 280)
                         }
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height - safe.top - safe.bottom, alignment: .center)
                     } else {
-                        VStack(spacing: 26) {
-                            introBlock
-                            menuBlock
+                        VStack(spacing: 22) {
+                            introBlock(width: contentWidth, compact: geo.size.height < 760)
+                            menuBlock(width: contentWidth)
                         }
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height - safe.top - safe.bottom, alignment: .center)
                     }
                 }
-                .padding(28)
+                .safeAreaPadding(.top, 20)
+                .safeAreaPadding(.bottom, 26)
             }
         }
     }
 
-    private var introBlock: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private func introBlock(width: CGFloat, compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 10 : 14) {
             Image("StartHeroMahjong")
                 .resizable()
                 .interpolation(.high)
-                .scaledToFill()
-                .frame(maxWidth: 430)
-                .frame(height: 184)
+                .scaledToFit()
+                .frame(width: width)
+                .frame(height: compact ? 142 : 176)
+                .background(.black.opacity(0.16))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -85,27 +91,30 @@ private struct StartScreen: View {
                 .shadow(color: .black.opacity(0.38), radius: 18, x: 0, y: 10)
 
             Text("SoloMahjong")
-                .font(.system(size: 38, weight: .black, design: .rounded))
+                .font(.system(size: compact ? 34 : 38, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
             Text("卓を囲む感覚で打てる\nひとり麻雀練習アプリ")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.system(size: compact ? 14 : 16, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.82))
             VStack(alignment: .leading, spacing: 8) {
                 menuPoint("縦横対応の本格卓上レイアウト")
                 menuPoint("ダブルタップ打牌とCPU思考演出")
                 menuPoint("東場から南場までスコア継続")
             }
-            .padding(.top, 8)
+            .padding(.top, compact ? 3 : 8)
         }
-        .frame(maxWidth: 430, alignment: .leading)
+        .frame(width: width, alignment: .leading)
     }
 
-    private var menuBlock: some View {
-        VStack(spacing: 14) {
+    private func menuBlock(width: CGFloat) -> some View {
+        VStack(spacing: 13) {
             Button(action: onStart) {
                 Text("対局を始める")
                     .font(.system(size: 19, weight: .black, design: .rounded))
-                    .frame(width: 260, height: 62)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 60)
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
@@ -113,11 +122,13 @@ private struct StartScreen: View {
             Button(action: onHowToPlay) {
                 Text("遊び方を見る")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
-                    .frame(width: 260, height: 62)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 60)
             }
             .buttonStyle(.bordered)
             .tint(.white)
         }
+        .frame(width: min(width, 340))
     }
 
     private func menuPoint(_ text: String) -> some View {

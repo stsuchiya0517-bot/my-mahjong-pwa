@@ -30,6 +30,21 @@ struct DiscardRecommendation: Identifiable, Hashable {
     let reason: String
 }
 
+enum UserCallAction: String, Identifiable, CaseIterable {
+    case chi = "チー"
+    case pon = "ポン"
+    case kan = "カン"
+
+    var id: String { rawValue }
+}
+
+struct PendingUserCall: Identifiable, Equatable {
+    let id = UUID()
+    let tile: MahjongTile
+    let fromPlayerIndex: Int
+    let actions: [UserCallAction]
+}
+
 @MainActor
 final class MahjongGameViewModel: ObservableObject {
     @Published var players: [MahjongPlayer] = []
@@ -47,6 +62,8 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var winningResult: WinResult?
     @Published var lastTappedTileID: MahjongTile.ID?
     @Published var lastTapDate: Date = .distantPast
+    @Published var pendingUserCall: PendingUserCall?
+    @Published var isDeclaringReach: Bool = false
 
     var roundTitle: String { roundState.title }
     var doraTiles: [MahjongTile] { doraIndicators.map(\.doraSuccessor) }
@@ -60,6 +77,16 @@ final class MahjongGameViewModel: ObservableObject {
 
     var canDiscard: Bool {
         selectedTile != nil && currentPlayerIndex == 0 && !isBusy && winningResult == nil
+    }
+
+    var canReach: Bool {
+        guard players.indices.contains(0), currentPlayerIndex == 0, !isBusy, pendingUserCall == nil else { return false }
+        return !players[0].isReach && players[0].melds.isEmpty && players[0].score >= 1000 && players[0].hand.count % 3 == 2 && estimatedShanten(for: players[0].hand) <= 1
+    }
+
+    var canClosedKan: Bool {
+        guard players.indices.contains(0), currentPlayerIndex == 0, !isBusy, pendingUserCall == nil else { return false }
+        return firstClosedKanTiles() != nil
     }
 
     var canTsumoWin: Bool {
@@ -139,6 +166,8 @@ final class MahjongGameViewModel: ObservableObject {
         lastDiscard = nil
         lastDiscardPlayerIndex = nil
         winningResult = nil
+        pendingUserCall = nil
+        isDeclaringReach = false
         turnNumber = 1
         lastTappedTileID = nil
         lastTapDate = .distantPast
@@ -174,6 +203,7 @@ final class MahjongGameViewModel: ObservableObject {
         guard let selectedTileID,
               currentPlayerIndex == 0,
               !isBusy,
+              pendingUserCall == nil,
               winningResult == nil,
               let index = players[0].hand.firstIndex(where: { $0.id == selectedTileID }) else {
             return
@@ -182,11 +212,21 @@ final class MahjongGameViewModel: ObservableObject {
         withAnimation(.easeInOut(duration: 0.22)) {
             let tile = players[0].hand.remove(at: index)
             players[0].discards.append(tile)
+            if isDeclaringReach {
+                players[0].isReach = true
+                players[0].reachDiscardID = tile.id
+                players[0].score -= 1000
+                roundState.riichiSticks += 1
+                isDeclaringReach = false
+                message = "リーチ。\(tile.label)を宣言牌として捨てました。"
+                log("あなた：リーチ")
+            } else {
+                message = "あなたは\(tile.label)を捨てました。"
+            }
             lastDiscard = tile
             lastDiscardPlayerIndex = 0
             self.selectedTileID = nil
             lastTappedTileID = nil
-            message = "あなたは\(tile.label)を捨てました。"
             log("あなた：\(tile.label)を打牌")
         }
 
@@ -195,6 +235,100 @@ final class MahjongGameViewModel: ObservableObject {
         }
 
         advanceToCPU()
+    }
+
+    func declareReach() {
+        guard canReach else { return }
+        isDeclaringReach = true
+        message = "リーチ宣言中です。宣言牌として捨てる牌を選んでください。"
+        log("あなた：リーチ準備")
+    }
+
+    func declareClosedKan() {
+        guard canClosedKan, let kanTiles = firstClosedKanTiles() else { return }
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+            for tile in kanTiles {
+                if let index = players[0].hand.firstIndex(where: { $0.id == tile.id }) {
+                    players[0].hand.remove(at: index)
+                }
+            }
+            players[0].melds.append(MahjongMeld(type: .kan, tiles: kanTiles, calledTile: nil, fromPlayerIndex: nil))
+            selectedTileID = nil
+            lastTappedTileID = nil
+        }
+        message = "\(kanTiles[0].label)を暗カンしました。嶺上牌をツモります。"
+        log("あなた：\(kanTiles[0].label)を暗カン")
+        if let rinshan = drawTile() {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+                players[0].hand.append(rinshan)
+                players[0].hand = players[0].hand.sortedForHand()
+            }
+            message = "\(kanTiles[0].label)を暗カン。\(rinshan.label)を嶺上ツモしました。"
+        }
+    }
+
+    func performUserCall(_ action: UserCallAction) {
+        guard let pendingUserCall, players.indices.contains(pendingUserCall.fromPlayerIndex), pendingUserCall.actions.contains(action) else { return }
+        let called = pendingUserCall.tile
+        let fromIndex = pendingUserCall.fromPlayerIndex
+        let consumed: [MahjongTile]
+        let meldType: MahjongMeldType
+
+        switch action {
+        case .pon:
+            guard let tiles = matchingTiles(for: called, count: 2) else { return }
+            consumed = tiles
+            meldType = .pon
+        case .kan:
+            guard let tiles = matchingTiles(for: called, count: 3) else { return }
+            consumed = tiles
+            meldType = .kan
+        case .chi:
+            guard fromIndex == 3, let tiles = chiTiles(for: called) else { return }
+            consumed = tiles
+            meldType = .chi
+        }
+
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.82)) {
+            for tile in consumed {
+                if let index = players[0].hand.firstIndex(where: { $0.id == tile.id }) {
+                    players[0].hand.remove(at: index)
+                }
+            }
+            players[fromIndex].discards.removeAll { $0.id == called.id }
+            let meldTiles = (consumed + [called]).sortedForHand()
+            players[0].melds.append(MahjongMeld(type: meldType, tiles: meldTiles, calledTile: called, fromPlayerIndex: fromIndex))
+            self.pendingUserCall = nil
+            currentPlayerIndex = 0
+            selectedTileID = nil
+            lastTappedTileID = nil
+            isBusy = false
+        }
+
+        message = "\(called.label)を\(meldType.rawValue)しました。次に捨てる牌を選んでください。"
+        log("あなた：\(called.label)を\(meldType.rawValue)")
+        if meldType == .kan, let rinshan = drawTile() {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
+                players[0].hand.append(rinshan)
+                players[0].hand = players[0].hand.sortedForHand()
+            }
+            message = "\(called.label)をカン。\(rinshan.label)を嶺上ツモしました。捨てる牌を選んでください。"
+            log("あなた：\(rinshan.label)を嶺上ツモ")
+        }
+    }
+
+    func skipUserCall() {
+        guard let pendingUserCall else { return }
+        let next = pendingUserCall.fromPlayerIndex + 1
+        self.pendingUserCall = nil
+        if next <= 3 {
+            continueCPU(from: next)
+        } else {
+            currentPlayerIndex = 0
+            turnNumber += 1
+            isBusy = false
+            drawForUserIfNeeded()
+        }
     }
 
     func cancelSelection() {
@@ -316,9 +450,13 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     private func advanceToCPU() {
+        continueCPU(from: 1)
+    }
+
+    private func continueCPU(from startIndex: Int) {
         Task {
             isBusy = true
-            for cpuIndex in 1...3 {
+            for cpuIndex in startIndex...3 {
                 guard winningResult == nil else { break }
                 currentPlayerIndex = cpuIndex
                 players[cpuIndex].isThinking = true
@@ -326,6 +464,11 @@ final class MahjongGameViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 420_000_000)
                 cpuTakeTurn(cpuIndex)
                 players[cpuIndex].isThinking = false
+                if pendingUserCall != nil {
+                    isBusy = false
+                    currentPlayerIndex = 0
+                    return
+                }
                 try? await Task.sleep(nanoseconds: 220_000_000)
             }
             guard winningResult == nil else {
@@ -365,6 +508,74 @@ final class MahjongGameViewModel: ObservableObject {
             message = "\(players[index].name)は\(tile.label)を捨てました。"
             log("\(players[index].name)：\(tile.label)を打牌")
         }
+        offerUserCallIfAvailable(on: lastDiscard, discardedBy: index)
+    }
+
+    private func offerUserCallIfAvailable(on discardedTile: MahjongTile?, discardedBy fromPlayerIndex: Int) {
+        guard let discardedTile, fromPlayerIndex != 0, players.indices.contains(0), winningResult == nil else { return }
+        var actions: [UserCallAction] = []
+        if matchingTiles(for: discardedTile, count: 2) != nil { actions.append(.pon) }
+        if matchingTiles(for: discardedTile, count: 3) != nil { actions.append(.kan) }
+        if fromPlayerIndex == 3, chiTiles(for: discardedTile) != nil { actions.append(.chi) }
+        guard !actions.isEmpty else { return }
+        pendingUserCall = PendingUserCall(tile: discardedTile, fromPlayerIndex: fromPlayerIndex, actions: actions)
+        message = "\(players[fromPlayerIndex].name)の\(discardedTile.label)を鳴けます。ポン・チー・カンを選ぶかスキップしてください。"
+        log("鳴き選択：\(discardedTile.label)")
+    }
+
+    private func matchingTiles(for tile: MahjongTile, count: Int) -> [MahjongTile]? {
+        let matches = players[0].hand.filter { $0.matchesKind(tile) }
+        guard matches.count >= count else { return nil }
+        return Array(matches.prefix(count))
+    }
+
+    private func chiTiles(for tile: MahjongTile) -> [MahjongTile]? {
+        guard tile.suit != .honor else { return nil }
+        let candidates = [
+            [tile.rank - 2, tile.rank - 1],
+            [tile.rank - 1, tile.rank + 1],
+            [tile.rank + 1, tile.rank + 2]
+        ].filter { ranks in
+            ranks.allSatisfy { (1...9).contains($0) }
+        }
+
+        for ranks in candidates {
+            var chosen: [MahjongTile] = []
+            for rank in ranks {
+                if let match = players[0].hand.first(where: { $0.suit == tile.suit && $0.rank == rank && !chosen.map(\.id).contains($0.id) }) {
+                    chosen.append(match)
+                }
+            }
+            if chosen.count == 2 { return chosen }
+        }
+        return nil
+    }
+
+    private func firstClosedKanTiles() -> [MahjongTile]? {
+        guard players.indices.contains(0) else { return nil }
+        let grouped = Dictionary(grouping: players[0].hand, by: { tileKey($0) })
+        return grouped.values.first(where: { $0.count >= 4 }).map { Array($0.prefix(4)) }
+    }
+
+    private func estimatedShanten(for hand: [MahjongTile]) -> Int {
+        let count = tileCounts(hand)
+        let pairs = count.values.filter { $0 >= 2 }.count
+        let meldLike = count.values.filter { $0 >= 3 }.count + sequenceLikeCount(in: count)
+        return max(0, 6 - pairs - meldLike * 2)
+    }
+
+    private func sequenceLikeCount(in counts: [Int: Int]) -> Int {
+        var total = 0
+        for base in [0, 10, 20] {
+            for rank in 1...7 {
+                if (counts[base + rank] ?? 0) > 0,
+                   (counts[base + rank + 1] ?? 0) > 0,
+                   (counts[base + rank + 2] ?? 0) > 0 {
+                    total += 1
+                }
+            }
+        }
+        return min(total, 4)
     }
 
     private func chooseDiscardIndex(for hand: [MahjongTile]) -> Int {

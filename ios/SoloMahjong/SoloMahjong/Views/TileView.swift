@@ -128,7 +128,7 @@ private struct TileFaceView: View {
     var body: some View {
         switch tile.suit {
         case .man:
-            GeneratedTileMark(name: "Man\(tile.rank)Mark", dense: dense)
+            WanFace(rank: tile.rank, dense: dense)
         case .pin:
             GeneratedTileMark(name: "Pin\(tile.rank)Mark", dense: dense)
         case .sou:
@@ -137,7 +137,7 @@ private struct TileFaceView: View {
             if tile.rank == 5 {
                 EmptyView()
             } else {
-                GeneratedTileMark(name: "Honor\(tile.rank)Mark", dense: dense)
+                HonorFace(rank: tile.rank, dense: dense)
             }
         }
     }
@@ -209,14 +209,7 @@ private struct HonorFace: View {
 
     var body: some View {
         if rank == 5 {
-            ZStack {
-                RoundedRectangle(cornerRadius: dense ? 1.5 : 2.2)
-                    .stroke(Color(red: 0.10, green: 0.22, blue: 0.62), lineWidth: dense ? 1.3 : 1.9)
-                RoundedRectangle(cornerRadius: dense ? 0.8 : 1.3)
-                    .stroke(Color(red: 0.10, green: 0.22, blue: 0.62).opacity(0.70), lineWidth: dense ? 0.7 : 1.0)
-                    .padding(dense ? 2.2 : 3.0)
-            }
-            .frame(width: dense ? 11 : 18, height: dense ? 14 : 22)
+            EmptyView()
         } else {
             Text(text)
                 .font(.system(size: dense ? 18 : 28, weight: .black, design: .serif))

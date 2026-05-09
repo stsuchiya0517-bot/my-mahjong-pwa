@@ -54,12 +54,6 @@ struct PortraitGameBoardView: View {
                     .frame(width: centerSize, height: centerSize)
                     .position(center)
 
-                TableEventBannerView(message: game.message, tone: game.eventTone)
-                    .id(game.message)
-                    .frame(width: min(w - 42, 320))
-                    .position(x: center.x, y: center.y - centerSize * 0.78)
-                    .animation(.spring(response: 0.26, dampingFraction: 0.82), value: game.message)
-
                 RiverView(tiles: game.players[safe: 2]?.discards ?? [], reachDiscardID: game.players[safe: 2]?.reachDiscardID, seat: .top)
                     .frame(width: min(w * 0.50, 210), height: 74)
                     .position(x: center.x, y: center.y - tableHalf)
