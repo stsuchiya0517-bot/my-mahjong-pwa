@@ -28,6 +28,20 @@ struct PlayerHandView: View {
                                     .scaleEffect(scale, anchor: .bottom)
                             }
                         }
+                        .overlay(alignment: .top) {
+                            if game.isDeclaringReach, canDiscard, let waits = game.reachWaitText(afterDiscarding: tile) {
+                                Text("待 \(waits)")
+                                    .font(.system(size: 7, weight: .black, design: .rounded))
+                                    .foregroundStyle(.black)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.55)
+                                    .padding(.horizontal, 3)
+                                    .padding(.vertical, 1)
+                                    .background(Color.yellow)
+                                    .clipShape(Capsule())
+                                    .offset(y: -9)
+                            }
+                        }
                         .offset(y: game.isAfterUserCall && canDiscard ? -3 : 0)
                         .contentShape(Rectangle())
                         .onTapGesture {

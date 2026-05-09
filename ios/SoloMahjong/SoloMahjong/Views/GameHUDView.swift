@@ -64,6 +64,16 @@ struct GameHUDView: View {
                 doraBadge(indicator: indicator, dora: dora)
                     .padding(.top, 2)
             }
+            if let waits = game.reachWaitText {
+                Text("リーチ待ち \(waits)")
+                    .font(.system(size: compact ? 9 : 10, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.yellow)
+                    .clipShape(Capsule())
+                    .padding(.top, 2)
+            }
         }
     }
 

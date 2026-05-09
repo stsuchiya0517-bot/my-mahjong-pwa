@@ -93,7 +93,7 @@ final class MahjongGameViewModel: ObservableObject {
 
     var canReach: Bool {
         guard players.indices.contains(0), currentPlayerIndex == 0, !isBusy, pendingUserCall == nil else { return false }
-        return !players[0].isReach && players[0].melds.isEmpty && players[0].score >= 1000 && players[0].hand.count % 3 == 2 && estimatedShanten(for: players[0].hand) <= 1
+        return canDeclareReach(from: players[0].hand)
     }
 
     var canClosedKan: Bool {
@@ -101,10 +101,26 @@ final class MahjongGameViewModel: ObservableObject {
         return !players[0].isReach && firstClosedKanTiles() != nil
     }
 
+    var reachWaitText: String? {
+        guard players.indices.contains(0), players[0].isReach else { return nil }
+        let waits = waitTiles(for: players[0].hand)
+        guard !waits.isEmpty else { return nil }
+        return waits.map(\.label).joined(separator: "・")
+    }
+
+    func reachWaitText(afterDiscarding tile: MahjongTile) -> String? {
+        let waits = waitTilesAfterDiscarding(tile)
+        guard !waits.isEmpty else { return nil }
+        return waits.map(\.label).joined(separator: "・")
+    }
+
     func canSelectForDiscard(_ tile: MahjongTile) -> Bool {
         guard currentPlayerIndex == 0, !isBusy, pendingUserCall == nil, winningResult == nil else { return false }
         if let forcedDiscardTileID {
             return tile.id == forcedDiscardTileID
+        }
+        if isDeclaringReach {
+            return isReachDiscardCandidate(tile)
         }
         return !forbiddenDiscardKeys.contains(tileKey(tile))
     }
@@ -273,6 +289,7 @@ final class MahjongGameViewModel: ObservableObject {
     func declareReach() {
         guard canReach else { return }
         isDeclaringReach = true
+        selectedTileID = nil
         message = "リーチ宣言中です。宣言牌として捨てる牌を選んでください。"
         log("あなた：リーチ準備")
     }
@@ -712,6 +729,75 @@ final class MahjongGameViewModel: ObservableObject {
             total + doraKinds.filter { tile.matchesKind($0) }.count
         }
     }
+
+    private func canDeclareReach(from hand: [MahjongTile]) -> Bool {
+        guard players.indices.contains(0),
+              !players[0].isReach,
+              players[0].melds.isEmpty,
+              players[0].score >= 1000,
+              hand.count % 3 == 2 else {
+            return false
+        }
+        return hand.contains { isReachDiscardCandidate($0) }
+    }
+
+    private func isReachDiscardCandidate(_ tile: MahjongTile) -> Bool {
+        !waitTilesAfterDiscarding(tile).isEmpty
+    }
+
+    private func isTenpai(_ thirteenTileHand: [MahjongTile]) -> Bool {
+        guard thirteenTileHand.count % 3 == 1 else { return false }
+        return !waitTiles(for: thirteenTileHand).isEmpty
+    }
+
+    private func waitTilesAfterDiscarding(_ tile: MahjongTile) -> [MahjongTile] {
+        guard players.indices.contains(0),
+              !players[0].isReach,
+              players[0].melds.isEmpty,
+              players[0].hand.count % 3 == 2,
+              let index = players[0].hand.firstIndex(where: { $0.id == tile.id }) else {
+            return []
+        }
+        var afterDiscard = players[0].hand
+        afterDiscard.remove(at: index)
+        return waitTiles(for: afterDiscard)
+    }
+
+    private func waitTiles(for thirteenTileHand: [MahjongTile]) -> [MahjongTile] {
+        guard thirteenTileHand.count % 3 == 1 else { return [] }
+        return Self.allTileKinds.filter { candidate in
+            isWinningShape(thirteenTileHand + [candidate])
+        }
+    }
+
+    private func isWinningShape(_ hand: [MahjongTile]) -> Bool {
+        guard hand.count % 3 == 2 else { return false }
+        let counts = tileCounts(hand)
+        return isKokushi(counts)
+            || isSevenPairs(counts)
+            || isStandardWinning(counts)
+            || isSuuAnkou(counts)
+            || isDaisangen(counts)
+            || isDaisuushi(counts)
+            || isShousuushi(counts)
+            || isTsuuiisou(hand)
+            || isChinroutou(hand)
+            || isRyuuiisou(hand)
+            || isChuuren(hand)
+    }
+
+    private static let allTileKinds: [MahjongTile] = {
+        var tiles: [MahjongTile] = []
+        for suit in [TileSuit.man, .pin, .sou] {
+            for rank in 1...9 {
+                tiles.append(MahjongTile(suit: suit, rank: rank, copy: 0))
+            }
+        }
+        for rank in 1...7 {
+            tiles.append(MahjongTile(suit: .honor, rank: rank, copy: 0))
+        }
+        return tiles
+    }()
 
     static func makeWall() -> [MahjongTile] {
         var tiles: [MahjongTile] = []
