@@ -48,6 +48,15 @@ struct TileView: View {
 
     private var isDense: Bool { effectiveStyle != .regular }
 
+    private var facePadding: CGFloat {
+        switch effectiveStyle {
+        case .regular: return 1.0
+        case .hand: return 0.8
+        case .handCompact: return 0.5
+        case .river: return 0.2
+        }
+    }
+
     var body: some View {
         ZStack {
             if effectiveStyle == .hand || effectiveStyle == .handCompact || effectiveStyle == .regular || effectiveStyle == .river {
@@ -100,7 +109,7 @@ struct TileView: View {
                 }
 
                 TileFaceView(tile: tile, dense: isDense)
-                    .padding(isDense ? 3 : 5.5)
+                    .padding(facePadding)
             }
         }
         .frame(width: width, height: height + ((effectiveStyle == .river) ? 0 : 3))
@@ -119,14 +128,29 @@ private struct TileFaceView: View {
     var body: some View {
         switch tile.suit {
         case .man:
-            WanFace(rank: tile.rank, dense: dense)
+            GeneratedTileMark(name: "Man\(tile.rank)Mark", dense: dense)
         case .pin:
-            PinFace(rank: tile.rank, dense: dense)
+            GeneratedTileMark(name: "Pin\(tile.rank)Mark", dense: dense)
         case .sou:
-            SouFace(rank: tile.rank, dense: dense)
+            GeneratedTileMark(name: "Sou\(tile.rank)Mark", dense: dense)
         case .honor:
-            HonorFace(rank: tile.rank, dense: dense)
+            GeneratedTileMark(name: "Honor\(tile.rank)Mark", dense: dense)
         }
+    }
+}
+
+private struct GeneratedTileMark: View {
+    let name: String
+    let dense: Bool
+
+    var body: some View {
+        Image(name)
+            .resizable()
+            .renderingMode(.original)
+            .interpolation(.high)
+            .scaledToFit()
+            .padding(dense ? 0 : 1)
+            .shadow(color: .black.opacity(0.10), radius: dense ? 0.25 : 0.45, x: 0, y: 0.35)
     }
 }
 
