@@ -29,13 +29,30 @@ struct LandscapeGameBoardView: View {
                     .frame(width: min(boardWidth * 0.48, 340), height: 28)
                     .position(x: center.x, y: safe.top + 32)
 
+                if let topPlayer = game.players[safe: 2] {
+                    OpponentView(player: topPlayer, isActive: game.currentPlayerIndex == 2)
+                        .position(x: center.x, y: safe.top + 62)
+                }
+
                 WallTileBackView(count: game.players[safe: 3]?.hand.count ?? 13, orientation: .vertical)
                     .frame(width: 30, height: min(h * 0.55, 330))
                     .position(x: leftRail + 22, y: center.y)
 
+                if let leftPlayer = game.players[safe: 3] {
+                    OpponentView(player: leftPlayer, isActive: game.currentPlayerIndex == 3)
+                        .rotationEffect(.degrees(90))
+                        .position(x: leftRail + 58, y: center.y - 112)
+                }
+
                 WallTileBackView(count: game.players[safe: 1]?.hand.count ?? 13, orientation: .vertical)
                     .frame(width: 30, height: min(h * 0.55, 330))
                     .position(x: w - rightRail - 22, y: center.y)
+
+                if let rightPlayer = game.players[safe: 1] {
+                    OpponentView(player: rightPlayer, isActive: game.currentPlayerIndex == 1)
+                        .rotationEffect(.degrees(-90))
+                        .position(x: w - rightRail - 58, y: center.y - 112)
+                }
 
                 AutoTableCenterView(game: game)
                     .frame(width: min(h * 0.34, 150), height: min(h * 0.34, 150))

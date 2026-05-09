@@ -15,6 +15,8 @@ struct GameBoardView: View {
                     PortraitGameBoardView(game: game, onMenu: onMenu)
                 }
             }
+            .sensoryFeedback(.selection, trigger: game.lastDiscard?.id)
+            .sensoryFeedback(.success, trigger: game.winningResult?.id)
         }
     }
 }

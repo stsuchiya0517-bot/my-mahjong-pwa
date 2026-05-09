@@ -25,13 +25,30 @@ struct PortraitGameBoardView: View {
                     .frame(width: min(w * 0.70, 286), height: 28)
                     .position(x: w / 2, y: safe.top + 100)
 
+                if let topPlayer = game.players[safe: 2] {
+                    OpponentView(player: topPlayer, isActive: game.currentPlayerIndex == 2)
+                        .position(x: w / 2, y: safe.top + 133)
+                }
+
                 WallTileBackView(count: game.players[safe: 3]?.hand.count ?? 13, orientation: .vertical)
                     .frame(width: 30, height: min(h * 0.37, 295))
                     .position(x: sideX, y: center.y + 12)
 
+                if let leftPlayer = game.players[safe: 3] {
+                    OpponentView(player: leftPlayer, isActive: game.currentPlayerIndex == 3)
+                        .rotationEffect(.degrees(90))
+                        .position(x: sideX + 34, y: center.y - 130)
+                }
+
                 WallTileBackView(count: game.players[safe: 1]?.hand.count ?? 13, orientation: .vertical)
                     .frame(width: 30, height: min(h * 0.37, 295))
                     .position(x: w - sideX, y: center.y + 12)
+
+                if let rightPlayer = game.players[safe: 1] {
+                    OpponentView(player: rightPlayer, isActive: game.currentPlayerIndex == 1)
+                        .rotationEffect(.degrees(-90))
+                        .position(x: w - sideX - 34, y: center.y - 130)
+                }
 
                 AutoTableCenterView(game: game)
                     .frame(width: centerSize, height: centerSize)
