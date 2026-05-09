@@ -18,13 +18,29 @@ struct WallTileBackView: View {
                     }
                 }
             } else {
-                VStack(spacing: -1) {
-                    ForEach(0..<min(count, 14), id: \.self) { _ in
-                        singleBack.rotationEffect(.degrees(90))
+                GeometryReader { geo in
+                    let tileCount = min(count, 14)
+                    let step = verticalStep(for: tileCount, height: geo.size.height)
+
+                    ZStack {
+                        ForEach(0..<tileCount, id: \.self) { index in
+                            singleBack
+                                .rotationEffect(.degrees(90))
+                                .position(
+                                    x: geo.size.width / 2,
+                                    y: 12 + CGFloat(index) * step
+                                )
+                        }
                     }
                 }
             }
         }
+    }
+
+    private func verticalStep(for tileCount: Int, height: CGFloat) -> CGFloat {
+        guard tileCount > 1 else { return 0 }
+        let fitted = (height - 24) / CGFloat(tileCount - 1)
+        return max(20, min(24, fitted))
     }
 
     private var singleBack: some View {
