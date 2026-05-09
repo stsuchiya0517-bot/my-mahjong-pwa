@@ -266,35 +266,13 @@ private struct SouFace: View {
     let dense: Bool
 
     var body: some View {
-        if rank == 1 {
-            OneSouFace(dense: dense)
-        } else {
-            GeometryReader { geo in
-                ZStack {
-                    ForEach(Array(layout(for: rank).enumerated()), id: \.offset) { index, point in
-                        RealBambooMark(color: bambooColor(index: index, rank: rank), dense: dense)
-                            .position(x: geo.size.width * point.x, y: geo.size.height * point.y)
-                    }
-                }
-            }
-        }
-    }
-
-    private func bambooColor(index: Int, rank: Int) -> BambooColor {
-        switch rank {
-        case 5:
-            return index == 2 ? .red : .green
-        case 6:
-            return [ .green, .green, .red, .red, .green, .green ][index]
-        case 7:
-            return index == 2 ? .red : .green
-        case 8:
-            return [ .green, .red, .green, .green, .red, .green, .green, .green ][index]
-        case 9:
-            return [ .green, .red, .green, .green, .green, .green, .green, .red, .green ][index]
-        default:
-            return .green
-        }
+        Image("Sou\(rank)Mark")
+            .resizable()
+            .renderingMode(.original)
+            .interpolation(.high)
+            .scaledToFit()
+            .padding(dense ? 0.3 : 0.8)
+            .shadow(color: .black.opacity(0.10), radius: dense ? 0.3 : 0.5, x: 0, y: 0.4)
     }
 }
 
