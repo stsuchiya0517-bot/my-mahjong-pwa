@@ -22,26 +22,24 @@ struct RiverView: View {
                 }
                 .rotationEffect(.degrees(180))
             case .left:
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(rowsForLeft, id: \.self) { row in
-                        HStack(spacing: 2) {
-                            ForEach(row, id: \.id) { tile in
-                                riverTile(tile).rotationEffect(.degrees(90))
-                            }
+                GeometryReader { geo in
+                    ZStack(alignment: .topLeading) {
+                        ForEach(Array(tiles.enumerated()), id: \.element.id) { index, tile in
+                            riverTile(tile)
+                                .rotationEffect(.degrees(90))
+                                .position(leftPosition(for: index, in: geo.size))
                         }
                     }
-                    Spacer(minLength: 0)
                 }
             case .right:
-                VStack(alignment: .trailing, spacing: 2) {
-                    ForEach(rowsForRight, id: \.self) { row in
-                        HStack(spacing: 2) {
-                            ForEach(row, id: \.id) { tile in
-                                riverTile(tile).rotationEffect(.degrees(-90))
-                            }
+                GeometryReader { geo in
+                    ZStack(alignment: .topLeading) {
+                        ForEach(Array(tiles.enumerated()), id: \.element.id) { index, tile in
+                            riverTile(tile)
+                                .rotationEffect(.degrees(-90))
+                                .position(rightPosition(for: index, in: geo.size))
                         }
                     }
-                    Spacer(minLength: 0)
                 }
             }
         }
@@ -53,16 +51,20 @@ struct RiverView: View {
         Array(repeating: GridItem(.fixed(29), spacing: 2), count: 6)
     }
 
-    private var rowsForLeft: [[MahjongTile]] {
-        stride(from: 0, to: tiles.count, by: 3).map { start in
-            Array(tiles[start..<min(start + 3, tiles.count)])
-        }
+    private func leftPosition(for index: Int, in size: CGSize) -> CGPoint {
+        let row = index % 6
+        let column = index / 6
+        let stepY = max(23, min(31, (size.height - 40) / 5))
+        let stepX: CGFloat = 30
+        return CGPoint(x: 18 + CGFloat(column) * stepX, y: 20 + CGFloat(row) * stepY)
     }
 
-    private var rowsForRight: [[MahjongTile]] {
-        stride(from: 0, to: tiles.count, by: 3).map { start in
-            Array(tiles[start..<min(start + 3, tiles.count)])
-        }.reversed()
+    private func rightPosition(for index: Int, in size: CGSize) -> CGPoint {
+        let row = index % 6
+        let column = index / 6
+        let stepY = max(23, min(31, (size.height - 40) / 5))
+        let stepX: CGFloat = 30
+        return CGPoint(x: size.width - 18 - CGFloat(column) * stepX, y: size.height - 20 - CGFloat(row) * stepY)
     }
 
     private func riverTile(_ tile: MahjongTile) -> some View {
