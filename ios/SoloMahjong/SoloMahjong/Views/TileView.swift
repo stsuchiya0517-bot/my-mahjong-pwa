@@ -132,7 +132,7 @@ private struct TileFaceView: View {
         case .pin:
             GeneratedTileMark(name: "Pin\(tile.rank)Mark", dense: dense)
         case .sou:
-            GeneratedTileMark(name: "Sou\(tile.rank)Mark", dense: dense)
+            SouFace(rank: tile.rank, dense: dense)
         case .honor:
             if tile.rank == 5 {
                 EmptyView()
@@ -291,13 +291,34 @@ private struct SouFace: View {
     let dense: Bool
 
     var body: some View {
-        Image("Sou\(rank)Mark")
-            .resizable()
-            .renderingMode(.original)
-            .interpolation(.high)
-            .scaledToFit()
-            .padding(dense ? 0.3 : 0.8)
-            .shadow(color: .black.opacity(0.10), radius: dense ? 0.3 : 0.5, x: 0, y: 0.4)
+        GeometryReader { geo in
+            if rank == 1 {
+                OneSouFace(dense: dense)
+                    .position(x: geo.size.width * 0.50, y: geo.size.height * 0.50)
+            } else {
+                ZStack {
+                    ForEach(Array(layout(for: rank).enumerated()), id: \.offset) { index, point in
+                        RealBambooMark(color: bambooColor(index: index, rank: rank), dense: dense)
+                            .position(x: geo.size.width * point.x, y: geo.size.height * point.y)
+                    }
+                }
+            }
+        }
+    }
+
+    private func bambooColor(index: Int, rank: Int) -> BambooColor {
+        switch rank {
+        case 5:
+            return index == 2 ? .red : .green
+        case 7:
+            return index == 2 ? .red : .green
+        case 8:
+            return index == 1 || index == 6 ? .red : .green
+        case 9:
+            return index == 4 ? .red : .green
+        default:
+            return .green
+        }
     }
 }
 
