@@ -102,6 +102,12 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var forcedDiscardTileID: MahjongTile.ID?
     @Published var isRinshanDraw: Bool = false
 
+    private var assistCacheSignature: String = ""
+    private var assistCacheRecommendations: [DiscardRecommendation] = []
+    private var yakuAimCacheSignature: String = ""
+    private var yakuAimCacheText: String = "狙い役を分析中"
+    private var shantenMemo: [String: Int] = [:]
+
     var roundTitle: String { roundState.title }
     var doraTiles: [MahjongTile] { doraIndicators.map(\.doraSuccessor) }
 
@@ -177,8 +183,18 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     var assistRecommendations: [DiscardRecommendation] {
-        guard players.indices.contains(0), !players[0].hand.isEmpty else { return [] }
-        return players[0].hand
+        guard players.indices.contains(0),
+              !players[0].hand.isEmpty,
+              currentPlayerIndex == 0,
+              !isBusy,
+              pendingUserCall == nil,
+              winningResult == nil else { return [] }
+        let signature = assistSignature()
+        if signature == assistCacheSignature {
+            return assistCacheRecommendations
+        }
+
+        let recommendations = players[0].hand
             .map { tile in
                 let analysis = discardAnalysis(for: tile, in: players[0].hand)
                 return DiscardRecommendation(tile: tile, score: analysis.score, reason: analysis.reason, detail: analysis.detail)
@@ -189,12 +205,22 @@ final class MahjongGameViewModel: ObservableObject {
             }
             .prefix(3)
             .map { $0 }
+        assistCacheSignature = signature
+        assistCacheRecommendations = recommendations
+        return recommendations
     }
 
     var assistYakuFocusText: String {
         guard players.indices.contains(0) else { return "狙い役を分析中" }
+        let signature = handKindSignature(players[0].hand)
+        if signature == yakuAimCacheSignature {
+            return yakuAimCacheText
+        }
         let aims = yakuAims(for: players[0].hand)
-        return aims.isEmpty ? "まずは向聴数と有効牌を優先" : aims.joined(separator: "・")
+        let text = aims.isEmpty ? "まずは向聴数と有効牌を優先" : aims.joined(separator: "・")
+        yakuAimCacheSignature = signature
+        yakuAimCacheText = text
+        return text
     }
 
     init() {
@@ -732,9 +758,20 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func chooseDiscardIndex(for hand: [MahjongTile]) -> Int {
         let ranked = hand.enumerated().map { pair -> (offset: Int, score: Int) in
-            (pair.offset, discardAnalysis(for: pair.element, in: hand).score)
+            (pair.offset, lightweightDiscardScore(for: pair.element, in: hand))
         }
         return ranked.max(by: { $0.score < $1.score })?.offset ?? hand.indices.randomElement() ?? 0
+    }
+
+    private func lightweightDiscardScore(for tile: MahjongTile, in hand: [MahjongTile]) -> Int {
+        var score = 0
+        let sameCount = hand.filter { $0.matchesKind(tile) }.count
+        score += isolationScore(for: tile, in: hand) * 10
+        if tile.suit == .honor { score += sameCount == 1 ? 14 : -20 }
+        if tile.rank == 1 || tile.rank == 9 { score += 8 }
+        if sameCount >= 2 { score -= 22 }
+        if countDora(in: [tile]) > 0 { score -= 42 }
+        return score
     }
 
     private func discardAnalysis(for tile: MahjongTile, in hand: [MahjongTile]) -> (score: Int, reason: String, detail: String) {
@@ -779,15 +816,25 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     private func currentShanten(for hand: [MahjongTile]) -> Int {
+        let signature = "shanten:\(hand.count):\(handKindSignature(hand))"
+        if let cached = shantenMemo[signature] { return cached }
+        let result: Int
         if hand.count % 3 == 2 {
-            if isWinningShape(hand) { return -1 }
-            return hand.indices.map { index in
+            if isWinningShape(hand) {
+                result = -1
+            } else {
+                result = hand.indices.map { index in
                 var copy = hand
                 copy.remove(at: index)
                 return thirteenTileShanten(copy)
             }.min() ?? 6
+            }
+        } else {
+            result = thirteenTileShanten(hand)
         }
-        return thirteenTileShanten(hand)
+        shantenMemo[signature] = result
+        if shantenMemo.count > 800 { shantenMemo.removeAll(keepingCapacity: true) }
+        return result
     }
 
     private func thirteenTileShanten(_ hand: [MahjongTile]) -> Int {
@@ -797,8 +844,15 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func standardShanten(_ counts: [Int: Int]) -> Int {
         var best = 8
+        var visited = Set<String>()
 
         func walk(_ counts: [Int: Int], melds: Int, pairs: Int, taatsu: Int) {
+            let optimisticTaatsu = min(taatsu, 4 - melds)
+            if 8 - melds * 2 - optimisticTaatsu - min(pairs, 1) >= best { return }
+            let stateKey = "\(melds)|\(pairs)|\(taatsu)|\(countsSignature(counts))"
+            guard !visited.contains(stateKey) else { return }
+            visited.insert(stateKey)
+
             guard let first = counts.keys.sorted().first(where: { (counts[$0] ?? 0) > 0 }) else {
                 let usableTaatsu = min(taatsu, 4 - melds)
                 best = min(best, 8 - melds * 2 - usableTaatsu - min(pairs, 1))
@@ -897,6 +951,33 @@ final class MahjongGameViewModel: ObservableObject {
             return $0.tile.sortKey < $1.tile.sortKey
         }
         return (tiles, tiles.reduce(0) { $0 + $1.remaining })
+    }
+
+    private func assistSignature() -> String {
+        guard players.indices.contains(0) else { return "empty" }
+        let discardSig = players.map { player in
+            player.discards.map { String(tileKey($0)) }.joined(separator: ",")
+        }.joined(separator: "|")
+        let meldSig = players.map { player in
+            player.melds.flatMap(\.tiles).map { String(tileKey($0)) }.joined(separator: ",")
+        }.joined(separator: "|")
+        return [
+            handKindSignature(players[0].hand),
+            doraIndicators.map { String(tileKey($0)) }.joined(separator: ","),
+            discardSig,
+            meldSig,
+            String(wall.count),
+            String(currentPlayerIndex),
+            String(isBusy)
+        ].joined(separator: "#")
+    }
+
+    private func handKindSignature(_ hand: [MahjongTile]) -> String {
+        countsSignature(tileCounts(hand))
+    }
+
+    private func countsSignature(_ counts: [Int: Int]) -> String {
+        counts.keys.sorted().map { "\($0):\(counts[$0] ?? 0)" }.joined(separator: ",")
     }
 
     private func visibleCounts(using hand: [MahjongTile]) -> [Int: Int] {
