@@ -191,6 +191,12 @@ final class MahjongGameViewModel: ObservableObject {
             .map { $0 }
     }
 
+    var assistYakuFocusText: String {
+        guard players.indices.contains(0) else { return "狙い役を分析中" }
+        let aims = yakuAims(for: players[0].hand)
+        return aims.isEmpty ? "まずは向聴数と有効牌を優先" : aims.joined(separator: "・")
+    }
+
     init() {
         startNewGame()
     }
@@ -547,7 +553,7 @@ final class MahjongGameViewModel: ObservableObject {
             Task {
                 isBusy = true
                 players[cpuIndex].isThinking = true
-                try? await Task.sleep(nanoseconds: 500_000_000)
+                try? await Task.sleep(nanoseconds: 160_000_000)
                 cpuDiscardAfterCall(cpuIndex)
                 players[cpuIndex].isThinking = false
                 isBusy = false
@@ -586,7 +592,7 @@ final class MahjongGameViewModel: ObservableObject {
                 currentPlayerIndex = cpuIndex
                 players[cpuIndex].isThinking = true
                 message = "\(players[cpuIndex].name)が考え中…"
-                try? await Task.sleep(nanoseconds: 420_000_000)
+                try? await Task.sleep(nanoseconds: 140_000_000)
                 cpuTakeTurn(cpuIndex)
                 players[cpuIndex].isThinking = false
                 if pendingUserCall != nil {
@@ -594,7 +600,7 @@ final class MahjongGameViewModel: ObservableObject {
                     currentPlayerIndex = 0
                     return
                 }
-                try? await Task.sleep(nanoseconds: 220_000_000)
+                try? await Task.sleep(nanoseconds: 60_000_000)
             }
             guard winningResult == nil else {
                 isBusy = false
@@ -926,6 +932,65 @@ final class MahjongGameViewModel: ObservableObject {
         return waits.contains { wait in
             players[0].discards.contains { $0.matchesKind(wait) }
         }
+    }
+
+    private func yakuAims(for hand: [MahjongTile]) -> [String] {
+        let counts = tileCounts(hand)
+        var aims: [(String, Int)] = []
+        let terminalHonorCount = hand.filter { $0.suit == .honor || $0.rank == 1 || $0.rank == 9 }.count
+        if terminalHonorCount <= 2 { aims.append(("断么九", 9 - terminalHonorCount * 2)) }
+
+        let suitGroups = Dictionary(grouping: hand.filter { $0.suit != .honor }, by: \.suit)
+        if let mainSuit = suitGroups.max(by: { $0.value.count < $1.value.count }) {
+            let honorCount = hand.filter { $0.suit == .honor }.count
+            if mainSuit.value.count + honorCount >= 9 {
+                aims.append((honorCount > 0 ? "混一色" : "清一色", mainSuit.value.count + honorCount))
+            }
+        }
+
+        let pairCount = counts.values.filter { $0 >= 2 }.count
+        if pairCount >= 4 { aims.append(("七対子", pairCount + 2)) }
+
+        let sequences = possibleSequenceStarts(in: counts)
+        if sequences.count >= 3 { aims.append(("平和", sequences.count + 2)) }
+        let duplicateSequences = Dictionary(grouping: sequences, by: { $0 }).values.map(\.count).max() ?? 0
+        if duplicateSequences >= 2 { aims.append(("一盃口", duplicateSequences + 5)) }
+
+        for start in 1...7 {
+            let suitCount = [0, 1, 2].filter { sequences.contains($0 * 10 + start) }.count
+            if suitCount >= 2 { aims.append(("三色同順", suitCount + 4)) }
+        }
+
+        for suit in [0, 1, 2] {
+            let hasIttsuBlocks = [1, 4, 7].filter { sequences.contains(suit * 10 + $0) }.count
+            if hasIttsuBlocks >= 2 { aims.append(("一気通貫", hasIttsuBlocks + 4)) }
+        }
+
+        let yakuhaiPairs = [31, 32, 35, 36, 37].filter { (counts[$0] ?? 0) >= 2 }.count
+        if yakuhaiPairs > 0 { aims.append(("役牌", yakuhaiPairs + 5)) }
+
+        return aims
+            .sorted { lhs, rhs in
+                if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                return lhs.0 < rhs.0
+            }
+            .prefix(3)
+            .map(\.0)
+    }
+
+    private func possibleSequenceStarts(in counts: [Int: Int]) -> [Int] {
+        var starts: [Int] = []
+        for suit in [0, 1, 2] {
+            for rank in 1...7 {
+                let key = suit * 10 + rank
+                if (counts[key] ?? 0) > 0,
+                   (counts[key + 1] ?? 0) > 0,
+                   (counts[key + 2] ?? 0) > 0 {
+                    starts.append(key)
+                }
+            }
+        }
+        return starts
     }
 
     private func isRonFuriten(on winningTile: MahjongTile) -> Bool {

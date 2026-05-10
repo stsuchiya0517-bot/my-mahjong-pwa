@@ -25,6 +25,21 @@ struct AssistPanelView: View {
                 metric(title: "巡目", value: "\(game.turnNumber)")
             }
 
+            HStack(spacing: 6) {
+                Image(systemName: "target")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(Color(red: 0.98, green: 0.86, blue: 0.34))
+                Text("近い役: \(game.assistYakuFocusText)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.86))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.07))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
             VStack(alignment: .leading, spacing: 7) {
                 ForEach(Array(game.assistRecommendations.enumerated()), id: \.element.id) { index, item in
                     Button {
