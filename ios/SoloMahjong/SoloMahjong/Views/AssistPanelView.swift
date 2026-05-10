@@ -47,10 +47,14 @@ struct AssistPanelView: View {
                                 Text(item.tile.label)
                                     .font(.system(size: 13, weight: .black, design: .rounded))
                                     .foregroundStyle(.white)
+                                Text(item.detail)
+                                    .font(.system(size: 9, weight: .black, design: .rounded))
+                                    .foregroundStyle(Color(red: 0.98, green: 0.86, blue: 0.34))
+                                    .lineLimit(1)
                                 Text(item.reason)
                                     .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(.white.opacity(0.64))
-                                    .lineLimit(2)
+                                    .lineLimit(3)
                             }
 
                             Spacer()

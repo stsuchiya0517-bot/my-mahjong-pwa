@@ -56,6 +56,7 @@ struct DiscardRecommendation: Identifiable, Hashable {
     let tile: MahjongTile
     let score: Int
     let reason: String
+    let detail: String
 }
 
 enum UserCallAction: String, Identifiable, CaseIterable {
@@ -160,11 +161,10 @@ final class MahjongGameViewModel: ObservableObject {
 
     var shantenText: String {
         guard players.indices.contains(0) else { return "--向聴" }
-        let count = tileCounts(players[0].hand)
-        let pairs = count.values.filter { $0 >= 2 }.count
-        let meldLike = count.values.filter { $0 >= 3 }.count
-        let estimate = max(0, 6 - pairs - meldLike * 2)
-        return "\(estimate)向聴"
+        let shanten = currentShanten(for: players[0].hand)
+        if shanten < 0 { return "和了形" }
+        if shanten == 0 { return "聴牌" }
+        return "\(shanten)向聴"
     }
 
     var eventTone: TableEventTone {
@@ -180,7 +180,8 @@ final class MahjongGameViewModel: ObservableObject {
         guard players.indices.contains(0), !players[0].hand.isEmpty else { return [] }
         return players[0].hand
             .map { tile in
-                DiscardRecommendation(tile: tile, score: discardScore(for: tile, in: players[0].hand), reason: assistReason(for: tile, in: players[0].hand))
+                let analysis = discardAnalysis(for: tile, in: players[0].hand)
+                return DiscardRecommendation(tile: tile, score: analysis.score, reason: analysis.reason, detail: analysis.detail)
             }
             .sorted { lhs, rhs in
                 if lhs.score != rhs.score { return lhs.score > rhs.score }
@@ -638,7 +639,8 @@ final class MahjongGameViewModel: ObservableObject {
     private func offerUserCallIfAvailable(on discardedTile: MahjongTile?, discardedBy fromPlayerIndex: Int) {
         guard let discardedTile, fromPlayerIndex != 0, players.indices.contains(0), winningResult == nil else { return }
         var actions: [UserCallAction] = []
-        if evaluateWin(for: players[0].hand + [discardedTile], playerIndex: 0, method: "ロン") != nil {
+        if evaluateWin(for: players[0].hand + [discardedTile], playerIndex: 0, method: "ロン") != nil,
+           !isRonFuriten(on: discardedTile) {
             actions.append(.ron)
         }
         if !players[0].isReach {
@@ -724,44 +726,213 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func chooseDiscardIndex(for hand: [MahjongTile]) -> Int {
         let ranked = hand.enumerated().map { pair -> (offset: Int, score: Int) in
-            (pair.offset, discardScore(for: pair.element, in: hand))
+            (pair.offset, discardAnalysis(for: pair.element, in: hand).score)
         }
         return ranked.max(by: { $0.score < $1.score })?.offset ?? hand.indices.randomElement() ?? 0
     }
 
-    private func discardScore(for tile: MahjongTile, in hand: [MahjongTile]) -> Int {
+    private func discardAnalysis(for tile: MahjongTile, in hand: [MahjongTile]) -> (score: Int, reason: String, detail: String) {
         let afterDiscard = hand.filter { $0.id != tile.id }
-        let waits = waitTiles(for: afterDiscard).count
-        var score = waits * 18
-        if isTenpai(afterDiscard) { score += 80 }
-        if countDora(in: [tile]) > 0 { score -= 35 }
-        if tile.suit == .honor { score += 8 }
-        if tile.rank == 1 || tile.rank == 9 { score += 5 }
-        let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
-        if sameCount >= 2 { score -= 9 }
-        if tile.suit != .honor {
-            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 1 }) { score -= 3 }
-            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 1 }) { score -= 3 }
-            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 2 }) { score -= 1 }
-            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 2 }) { score -= 1 }
-        }
-        return score
-    }
-
-    private func assistReason(for tile: MahjongTile, in hand: [MahjongTile]) -> String {
-        let afterDiscard = hand.filter { $0.id != tile.id }
+        let shanten = currentShanten(for: afterDiscard)
+        let effective = effectiveTileBreakdown(for: afterDiscard)
         let waits = waitTiles(for: afterDiscard)
+        let doraPenalty = countDora(in: [tile]) * 42
+        var score = max(0, 6 - max(shanten, 0)) * 100 + effective.total * 5 + waits.count * 28 - doraPenalty
+        let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
+        let isolated = isolationScore(for: tile, in: hand)
+        score += isolated * 8
+        if sameCount >= 2 { score -= 28 }
+        if tile.suit != .honor {
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 1 }) { score -= 14 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 1 }) { score -= 14 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank - 2 }) { score -= 7 }
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + 2 }) { score -= 7 }
+        }
+
+        let shantenLabel = shanten <= 0 ? "聴牌" : "\(shanten)向聴"
+        let topEffective = effective.tiles.prefix(6).map { "\($0.tile.label)\($0.remaining)枚" }.joined(separator: "・")
+        let effectiveText = effective.total > 0 ? "有効牌\(effective.total)枚（\(topEffective)）" : "有効牌が少なく、手が進みにくい形です"
+        var reasonParts: [String] = ["\(tile.label)を切ると\(shantenLabel)、\(effectiveText)。"]
         if !waits.isEmpty {
-            return "\(tile.label)を切ると\(waits.map(\.label).joined(separator: "・"))待ちです。受け入れが見えているため候補です。"
+            reasonParts.append("待ちは\(waits.map(\.label).joined(separator: "・"))です。")
         }
         if countDora(in: [tile]) > 0 {
-            return "\(tile.label)はドラなので基本は残したい牌です。孤立していても慎重に切りましょう。"
+            reasonParts.append("ただしドラなので、同程度の候補があれば残したい牌です。")
+        } else if isolated >= 2 {
+            reasonParts.append("周辺のつながりが薄く、形を壊しにくい打牌です。")
+        } else if sameCount >= 2 {
+            reasonParts.append("対子を崩すため、受け入れが大きく伸びない限り優先度は下がります。")
         }
-        let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
-        if sameCount >= 2 { return "対子以上なので少し残したい牌です。" }
-        if tile.suit == .honor { return "孤立字牌は序盤の整理候補です。" }
-        if tile.rank == 1 || tile.rank == 9 { return "端牌で横の伸びが少なめです。" }
-        return "周辺のつながりが薄い候補です。"
+        if isFuritenRisk(waits: waits) {
+            reasonParts.append("自分の河に待ち牌があり、フリテン注意です。")
+        }
+
+        let detailShantenLabel = shanten <= 0 ? "聴牌" : "\(shanten)向聴"
+        let detail = "評価: \(detailShantenLabel) / 有効牌\(effective.total)枚 / 孤立\(isolated) / ドラ\(countDora(in: [tile]))"
+        return (score, reasonParts.joined(separator: " "), detail)
+    }
+
+    private func currentShanten(for hand: [MahjongTile]) -> Int {
+        if hand.count % 3 == 2 {
+            if isWinningShape(hand) { return -1 }
+            return hand.indices.map { index in
+                var copy = hand
+                copy.remove(at: index)
+                return thirteenTileShanten(copy)
+            }.min() ?? 6
+        }
+        return thirteenTileShanten(hand)
+    }
+
+    private func thirteenTileShanten(_ hand: [MahjongTile]) -> Int {
+        let counts = tileCounts(hand)
+        return min(standardShanten(counts), sevenPairsShanten(counts), kokushiShanten(counts))
+    }
+
+    private func standardShanten(_ counts: [Int: Int]) -> Int {
+        var best = 8
+
+        func walk(_ counts: [Int: Int], melds: Int, pairs: Int, taatsu: Int) {
+            guard let first = counts.keys.sorted().first(where: { (counts[$0] ?? 0) > 0 }) else {
+                let usableTaatsu = min(taatsu, 4 - melds)
+                best = min(best, 8 - melds * 2 - usableTaatsu - min(pairs, 1))
+                return
+            }
+
+            var skip = counts
+            skip[first, default: 0] -= 1
+            if skip[first] == 0 { skip.removeValue(forKey: first) }
+            walk(skip, melds: melds, pairs: pairs, taatsu: taatsu)
+
+            if (counts[first] ?? 0) >= 3 {
+                var copy = counts
+                copy[first, default: 0] -= 3
+                if copy[first] == 0 { copy.removeValue(forKey: first) }
+                walk(copy, melds: melds + 1, pairs: pairs, taatsu: taatsu)
+            }
+
+            if (counts[first] ?? 0) >= 2 {
+                var copy = counts
+                copy[first, default: 0] -= 2
+                if copy[first] == 0 { copy.removeValue(forKey: first) }
+                walk(copy, melds: melds, pairs: pairs + 1, taatsu: taatsu + (pairs > 0 ? 1 : 0))
+            }
+
+            let suit = first / 10
+            let rank = first % 10
+            if suit < 3 {
+                if rank <= 7, (counts[first + 1] ?? 0) > 0, (counts[first + 2] ?? 0) > 0 {
+                    var copy = counts
+                    [first, first + 1, first + 2].forEach {
+                        copy[$0, default: 0] -= 1
+                        if copy[$0] == 0 { copy.removeValue(forKey: $0) }
+                    }
+                    walk(copy, melds: melds + 1, pairs: pairs, taatsu: taatsu)
+                }
+                if rank <= 8, (counts[first + 1] ?? 0) > 0 {
+                    var copy = counts
+                    [first, first + 1].forEach {
+                        copy[$0, default: 0] -= 1
+                        if copy[$0] == 0 { copy.removeValue(forKey: $0) }
+                    }
+                    walk(copy, melds: melds, pairs: pairs, taatsu: taatsu + 1)
+                }
+                if rank <= 7, (counts[first + 2] ?? 0) > 0 {
+                    var copy = counts
+                    [first, first + 2].forEach {
+                        copy[$0, default: 0] -= 1
+                        if copy[$0] == 0 { copy.removeValue(forKey: $0) }
+                    }
+                    walk(copy, melds: melds, pairs: pairs, taatsu: taatsu + 1)
+                }
+            }
+        }
+
+        walk(counts, melds: 0, pairs: 0, taatsu: 0)
+        return max(0, best)
+    }
+
+    private func sevenPairsShanten(_ counts: [Int: Int]) -> Int {
+        let pairs = counts.values.filter { $0 >= 2 }.count
+        let unique = counts.values.filter { $0 > 0 }.count
+        return max(0, 6 - pairs + max(0, 7 - unique))
+    }
+
+    private func kokushiShanten(_ counts: [Int: Int]) -> Int {
+        let required = [1, 9, 11, 19, 21, 29, 31, 32, 33, 34, 35, 36, 37]
+        let unique = required.filter { (counts[$0] ?? 0) > 0 }.count
+        let pair = required.contains { (counts[$0] ?? 0) >= 2 } ? 1 : 0
+        return max(0, 13 - unique - pair)
+    }
+
+    private func effectiveTileBreakdown(for thirteenTileHand: [MahjongTile]) -> (tiles: [(tile: MahjongTile, remaining: Int)], total: Int) {
+        guard thirteenTileHand.count % 3 == 1 else { return ([], 0) }
+        let baseShanten = thirteenTileShanten(thirteenTileHand)
+        let visible = visibleCounts(using: thirteenTileHand)
+        var tiles: [(tile: MahjongTile, remaining: Int)] = []
+
+        for candidate in Self.allTileKinds {
+            let remaining = max(0, 4 - (visible[tileKey(candidate)] ?? 0))
+            guard remaining > 0 else { continue }
+            let withDraw = thirteenTileHand + [candidate]
+            let improves: Bool
+            if baseShanten == 0 {
+                improves = isWinningShape(withDraw)
+            } else {
+                improves = currentShanten(for: withDraw) < baseShanten
+            }
+            if improves {
+                tiles.append((candidate, remaining))
+            }
+        }
+
+        tiles.sort {
+            if $0.remaining != $1.remaining { return $0.remaining > $1.remaining }
+            return $0.tile.sortKey < $1.tile.sortKey
+        }
+        return (tiles, tiles.reduce(0) { $0 + $1.remaining })
+    }
+
+    private func visibleCounts(using hand: [MahjongTile]) -> [Int: Int] {
+        var visible = tileCounts(hand)
+        for indicator in doraIndicators { visible[tileKey(indicator), default: 0] += 1 }
+        for player in players {
+            for tile in player.discards { visible[tileKey(tile), default: 0] += 1 }
+            for tile in player.melds.flatMap(\.tiles) { visible[tileKey(tile), default: 0] += 1 }
+        }
+        return visible
+    }
+
+    private func isolationScore(for tile: MahjongTile, in hand: [MahjongTile]) -> Int {
+        if tile.suit == .honor {
+            let sameCount = hand.filter { $0.matchesKind(tile) }.count
+            if [35, 36, 37, 31, 32].contains(tileKey(tile)) { return sameCount == 1 ? 1 : -2 }
+            return sameCount == 1 ? 3 : -2
+        }
+        var links = 0
+        for distance in [-2, -1, 1, 2] {
+            if hand.contains(where: { $0.suit == tile.suit && $0.rank == tile.rank + distance }) {
+                links += distance.magnitude == 1 ? 2 : 1
+            }
+        }
+        if hand.filter({ $0.matchesKind(tile) }).count >= 2 { links += 3 }
+        if links == 0 { return 3 }
+        if links <= 2 { return 1 }
+        return -2
+    }
+
+    private func isFuritenRisk(waits: [MahjongTile]) -> Bool {
+        guard players.indices.contains(0), !waits.isEmpty else { return false }
+        return waits.contains { wait in
+            players[0].discards.contains { $0.matchesKind(wait) }
+        }
+    }
+
+    private func isRonFuriten(on winningTile: MahjongTile) -> Bool {
+        guard players.indices.contains(0) else { return false }
+        let waits = waitTiles(for: players[0].hand)
+        guard waits.contains(where: { $0.matchesKind(winningTile) }) else { return false }
+        return isFuritenRisk(waits: waits)
     }
 
     private func drawTile() -> MahjongTile? {
