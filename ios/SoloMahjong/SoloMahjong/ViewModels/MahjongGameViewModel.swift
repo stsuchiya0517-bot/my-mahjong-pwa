@@ -718,6 +718,7 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func drawTile() -> MahjongTile? {
         guard !wall.isEmpty else {
+            guard roundNotice == nil else { return nil }
             message = "流局です。次局へ進みます。"
             roundState.honba += 1
             isBusy = true
@@ -786,9 +787,7 @@ final class MahjongGameViewModel: ObservableObject {
         }
 
         var han = 0
-        if isSevenPairs(counts) { han += 1 }
-        if method == "ツモ" { han += 1 }
-        if players.indices.contains(playerIndex), players[playerIndex].isReach { han += 1 }
+        han += normalYakuList(for: hand, counts: counts, playerIndex: playerIndex, method: method, sevenPairs: isSevenPairs(counts)).count
         han += countDora(in: hand)
         han = max(1, han)
         return (dealer ? 1500 : 1000) * han
@@ -822,6 +821,48 @@ final class MahjongGameViewModel: ObservableObject {
         return hand.reduce(0) { total, tile in
             total + doraKinds.filter { tile.matchesKind($0) }.count
         }
+    }
+
+    private func normalYakuList(for hand: [MahjongTile], counts: [Int: Int], playerIndex: Int, method: String, sevenPairs: Bool) -> [String] {
+        var yaku: [String] = []
+        let melds = players.indices.contains(playerIndex) ? players[playerIndex].melds : []
+        let isClosed = melds.isEmpty
+
+        if sevenPairs { yaku.append("七対子") }
+        if method == "ツモ", isClosed { yaku.append("門前清自摸和") }
+        if players.indices.contains(playerIndex), players[playerIndex].isReach { yaku.append("リーチ") }
+        if isTanyao(hand, melds: melds) { yaku.append("断么九") }
+        if hasYakuhai(counts: counts, melds: melds, playerIndex: playerIndex) { yaku.append("役牌") }
+        if isToitoi(counts: counts, melds: melds) { yaku.append("対々和") }
+        return yaku
+    }
+
+    private func isTanyao(_ hand: [MahjongTile], melds: [MahjongMeld]) -> Bool {
+        (hand + melds.flatMap(\.tiles)).allSatisfy { tile in
+            tile.suit != .honor && (2...8).contains(tile.rank)
+        }
+    }
+
+    private func hasYakuhai(counts: [Int: Int], melds: [MahjongMeld], playerIndex: Int) -> Bool {
+        var keys = Set<Int>()
+        for (key, count) in counts where count >= 3 { keys.insert(key) }
+        for meld in melds where meld.type == .pon || meld.type == .kan {
+            if let tile = meld.tiles.first { keys.insert(tileKey(tile)) }
+        }
+        let seatWindKey = 31 + playerIndex
+        let roundWindKey = roundState.wind == .east ? 31 : 32
+        return keys.contains(35) || keys.contains(36) || keys.contains(37) || keys.contains(seatWindKey) || keys.contains(roundWindKey)
+    }
+
+    private func isToitoi(counts: [Int: Int], melds: [MahjongMeld]) -> Bool {
+        guard !melds.contains(where: { $0.type == .chi }) else { return false }
+        var pairCount = 0
+        for count in counts.values {
+            if count == 2 { pairCount += 1 }
+            else if count == 3 || count == 4 { continue }
+            else { return false }
+        }
+        return pairCount == 1
     }
 
     private func canDeclareReach(from hand: [MahjongTile]) -> Bool {
@@ -959,11 +1000,8 @@ extension MahjongGameViewModel {
             )
         }
 
-        var normalYaku: [String] = []
-        if sevenPairs { normalYaku.append("七対子") }
-        if method == "ツモ" { normalYaku.append("門前清自摸和") }
-        if players.indices.contains(playerIndex), players[playerIndex].isReach { normalYaku.append("リーチ") }
-        if normalYaku.isEmpty { normalYaku.append("和了形") }
+        let normalYaku = normalYakuList(for: hand, counts: counts, playerIndex: playerIndex, method: method, sevenPairs: sevenPairs)
+        guard !normalYaku.isEmpty else { return nil }
         let doraCount = countDora(in: hand)
         let displayYaku = doraCount > 0 ? normalYaku + ["ドラ\(doraCount)"] : normalYaku
         let han = max(1, normalYaku.count + doraCount)

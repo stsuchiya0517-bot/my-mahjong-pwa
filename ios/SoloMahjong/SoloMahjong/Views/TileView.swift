@@ -132,7 +132,7 @@ private struct TileFaceView: View {
         case .pin:
             GeneratedTileMark(name: "Pin\(tile.rank)Mark", dense: dense)
         case .sou:
-            SouFace(rank: tile.rank, dense: dense)
+            GeneratedTileMark(name: "Sou\(tile.rank)Mark", dense: dense)
         case .honor:
             if tile.rank == 5 {
                 EmptyView()
@@ -153,7 +153,7 @@ private struct GeneratedTileMark: View {
             .renderingMode(.original)
             .interpolation(.high)
             .scaledToFit()
-            .padding(dense ? 0 : 1)
+            .padding(dense ? -1.2 : -0.6)
             .shadow(color: .black.opacity(0.10), radius: dense ? 0.25 : 0.45, x: 0, y: 0.35)
     }
 }
