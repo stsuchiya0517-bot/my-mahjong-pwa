@@ -59,6 +59,7 @@ struct DiscardRecommendation: Identifiable, Hashable {
 }
 
 enum UserCallAction: String, Identifiable, CaseIterable {
+    case ron = "ロン"
     case chi = "チー"
     case pon = "ポン"
     case kan = "カン"
@@ -98,6 +99,7 @@ final class MahjongGameViewModel: ObservableObject {
     @Published var forbiddenDiscardKeys: Set<Int> = []
     @Published var isAfterUserCall: Bool = false
     @Published var forcedDiscardTileID: MahjongTile.ID?
+    @Published var isRinshanDraw: Bool = false
 
     var roundTitle: String { roundState.title }
     var doraTiles: [MahjongTile] { doraIndicators.map(\.doraSuccessor) }
@@ -139,6 +141,9 @@ final class MahjongGameViewModel: ObservableObject {
 
     func canSelectForDiscard(_ tile: MahjongTile) -> Bool {
         guard currentPlayerIndex == 0, !isBusy, pendingUserCall == nil, winningResult == nil else { return false }
+        if players.indices.contains(0), players[0].isReach, canTsumoWin {
+            return false
+        }
         if let forcedDiscardTileID {
             return tile.id == forcedDiscardTileID
         }
@@ -239,6 +244,7 @@ final class MahjongGameViewModel: ObservableObject {
         forbiddenDiscardKeys.removeAll()
         isAfterUserCall = false
         forcedDiscardTileID = nil
+        isRinshanDraw = false
         turnNumber = 1
         lastTappedTileID = nil
         lastTapDate = .distantPast
@@ -307,6 +313,7 @@ final class MahjongGameViewModel: ObservableObject {
             forbiddenDiscardKeys.removeAll()
             isAfterUserCall = false
             forcedDiscardTileID = nil
+            isRinshanDraw = false
             log("あなた：\(tile.label)を打牌")
         }
 
@@ -346,6 +353,7 @@ final class MahjongGameViewModel: ObservableObject {
                 players[0].hand.append(rinshan)
                 players[0].hand = players[0].hand.sortedForHand()
             }
+            isRinshanDraw = true
             message = "\(kanTiles[0].label)を暗カン。\(rinshan.label)を嶺上ツモしました。"
         }
     }
@@ -358,6 +366,21 @@ final class MahjongGameViewModel: ObservableObject {
         let meldType: MahjongMeldType
 
         switch action {
+        case .ron:
+            guard let result = evaluateWin(for: players[0].hand + [called], playerIndex: 0, method: "ロン") else { return }
+            players[fromIndex].discards.removeAll { $0.id == called.id }
+            players[0].hand.append(called)
+            players[0].hand = players[0].hand.sortedForHand()
+            self.pendingUserCall = nil
+            currentPlayerIndex = 0
+            isBusy = false
+            lastDiscard = called
+            lastDiscardPlayerIndex = fromIndex
+            winningResult = result
+            applyWinScore(playerIndex: 0, method: "ロン")
+            message = "ロン和了しました。"
+            log("あなた：\(called.label)でロン")
+            return
         case .pon:
             guard let tiles = matchingTiles(for: called, count: 2) else { return }
             consumed = tiles
@@ -398,6 +421,7 @@ final class MahjongGameViewModel: ObservableObject {
                 players[0].hand.append(rinshan)
                 players[0].hand = players[0].hand.sortedForHand()
             }
+            isRinshanDraw = true
             message = "\(called.label)をカン。\(rinshan.label)を嶺上ツモしました。捨てる牌を選んでください。"
             log("あなた：\(rinshan.label)を嶺上ツモ")
         }
@@ -439,9 +463,15 @@ final class MahjongGameViewModel: ObservableObject {
                 players[0].hand = players[0].hand.sortedForHand()
             }
             if players[0].isReach {
-                forcedDiscardTileID = drawn.id
-                selectedTileID = drawn.id
-                message = "リーチ後なので手を変えられません。ツモった\(drawn.label)だけ捨てられます。"
+                if evaluateWin(for: players[0].hand, playerIndex: 0, method: "ツモ") != nil {
+                    forcedDiscardTileID = nil
+                    selectedTileID = nil
+                    message = "リーチ後に待ち牌の\(drawn.label)をツモりました。ツモ和了を選んでください。"
+                } else {
+                    forcedDiscardTileID = drawn.id
+                    selectedTileID = drawn.id
+                    message = "リーチ後なので手を変えられません。ツモった\(drawn.label)だけ捨てられます。"
+                }
             } else {
                 message = "\(drawn.label)をツモりました。捨てる牌を選んでください。"
             }
@@ -607,11 +637,15 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func offerUserCallIfAvailable(on discardedTile: MahjongTile?, discardedBy fromPlayerIndex: Int) {
         guard let discardedTile, fromPlayerIndex != 0, players.indices.contains(0), winningResult == nil else { return }
-        guard !players[0].isReach else { return }
         var actions: [UserCallAction] = []
-        if matchingTiles(for: discardedTile, count: 2) != nil { actions.append(.pon) }
-        if matchingTiles(for: discardedTile, count: 3) != nil { actions.append(.kan) }
-        if fromPlayerIndex == 3, chiTiles(for: discardedTile) != nil { actions.append(.chi) }
+        if evaluateWin(for: players[0].hand + [discardedTile], playerIndex: 0, method: "ロン") != nil {
+            actions.append(.ron)
+        }
+        if !players[0].isReach {
+            if matchingTiles(for: discardedTile, count: 2) != nil { actions.append(.pon) }
+            if matchingTiles(for: discardedTile, count: 3) != nil { actions.append(.kan) }
+            if fromPlayerIndex == 3, chiTiles(for: discardedTile) != nil { actions.append(.chi) }
+        }
         guard !actions.isEmpty else { return }
         pendingUserCall = PendingUserCall(tile: discardedTile, fromPlayerIndex: fromPlayerIndex, actions: actions)
         message = "\(players[fromPlayerIndex].name)の\(discardedTile.label)を鳴けます。ポン・チー・カンを選ぶかスキップしてください。"
@@ -654,6 +688,8 @@ final class MahjongGameViewModel: ObservableObject {
 
     private func forbiddenKeysAfterCall(action: UserCallAction, called: MahjongTile, consumed: [MahjongTile]) -> Set<Int> {
         switch action {
+        case .ron:
+            return []
         case .kan:
             return []
         case .pon:
@@ -694,7 +730,11 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     private func discardScore(for tile: MahjongTile, in hand: [MahjongTile]) -> Int {
-        var score = 0
+        let afterDiscard = hand.filter { $0.id != tile.id }
+        let waits = waitTiles(for: afterDiscard).count
+        var score = waits * 18
+        if isTenpai(afterDiscard) { score += 80 }
+        if countDora(in: [tile]) > 0 { score -= 35 }
         if tile.suit == .honor { score += 8 }
         if tile.rank == 1 || tile.rank == 9 { score += 5 }
         let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
@@ -709,6 +749,14 @@ final class MahjongGameViewModel: ObservableObject {
     }
 
     private func assistReason(for tile: MahjongTile, in hand: [MahjongTile]) -> String {
+        let afterDiscard = hand.filter { $0.id != tile.id }
+        let waits = waitTiles(for: afterDiscard)
+        if !waits.isEmpty {
+            return "\(tile.label)を切ると\(waits.map(\.label).joined(separator: "・"))待ちです。受け入れが見えているため候補です。"
+        }
+        if countDora(in: [tile]) > 0 {
+            return "\(tile.label)はドラなので基本は残したい牌です。孤立していても慎重に切りましょう。"
+        }
         let sameCount = hand.filter { $0.suit == tile.suit && $0.rank == tile.rank }.count
         if sameCount >= 2 { return "対子以上なので少し残したい牌です。" }
         if tile.suit == .honor { return "孤立字牌は序盤の整理候補です。" }
@@ -834,6 +882,18 @@ final class MahjongGameViewModel: ObservableObject {
         if isTanyao(hand, melds: melds) { yaku.append("断么九") }
         if hasYakuhai(counts: counts, melds: melds, playerIndex: playerIndex) { yaku.append("役牌") }
         if isToitoi(counts: counts, melds: melds) { yaku.append("対々和") }
+        if method == "ツモ", isRinshanDraw { yaku.append("嶺上開花") }
+        if method == "ツモ", wall.isEmpty { yaku.append("海底摸月") }
+
+        if let standard = standardDecomposition(counts) {
+            let sequenceMelds = standard.melds.filter { isSequence($0) }
+            if isClosed, isPinfu(pair: standard.pair, melds: standard.melds, playerIndex: playerIndex) { yaku.append("平和") }
+            if isClosed, hasIipeikou(sequenceMelds) { yaku.append("一盃口") }
+            if hasSanshoku(sequenceMelds) { yaku.append("三色同順") }
+            if hasIttsu(sequenceMelds) { yaku.append("一気通貫") }
+        }
+        if isChinitsu(hand, melds: melds) { yaku.append("清一色") }
+        else if isHonitsu(hand, melds: melds) { yaku.append("混一色") }
         return yaku
     }
 
@@ -863,6 +923,18 @@ final class MahjongGameViewModel: ObservableObject {
             else { return false }
         }
         return pairCount == 1
+    }
+
+    private func isChinitsu(_ hand: [MahjongTile], melds: [MahjongMeld]) -> Bool {
+        let tiles = hand + melds.flatMap(\.tiles)
+        let suits = Set(tiles.map(\.suit))
+        return suits.count == 1 && suits.first != .honor
+    }
+
+    private func isHonitsu(_ hand: [MahjongTile], melds: [MahjongMeld]) -> Bool {
+        let tiles = hand + melds.flatMap(\.tiles)
+        let numberedSuits = Set(tiles.filter { $0.suit != .honor }.map(\.suit))
+        return numberedSuits.count == 1 && tiles.contains(where: { $0.suit == .honor })
     }
 
     private func canDeclareReach(from hand: [MahjongTile]) -> Bool {
@@ -1081,6 +1153,82 @@ extension MahjongGameViewModel {
             if canFormMelds(counts) { return true }
         }
 
+        return false
+    }
+
+    private func standardDecomposition(_ counts: [Int: Int]) -> (pair: Int, melds: [[Int]])? {
+        for (key, count) in counts where count >= 2 {
+            var copy = counts
+            copy[key, default: 0] -= 2
+            if copy[key] == 0 { copy.removeValue(forKey: key) }
+            if let melds = decomposeMelds(copy) {
+                return (key, melds)
+            }
+        }
+        return nil
+    }
+
+    private func decomposeMelds(_ counts: [Int: Int]) -> [[Int]]? {
+        guard let first = counts.keys.sorted().first(where: { (counts[$0] ?? 0) > 0 }) else { return [] }
+        var counts = counts
+
+        if (counts[first] ?? 0) >= 3 {
+            counts[first, default: 0] -= 3
+            if counts[first] == 0 { counts.removeValue(forKey: first) }
+            if let rest = decomposeMelds(counts) {
+                return [[first, first, first]] + rest
+            }
+            counts[first, default: 0] += 3
+        }
+
+        let suit = first / 10
+        let rank = first % 10
+        if suit < 3, rank <= 7, (counts[first + 1] ?? 0) > 0, (counts[first + 2] ?? 0) > 0 {
+            counts[first, default: 0] -= 1
+            counts[first + 1, default: 0] -= 1
+            counts[first + 2, default: 0] -= 1
+            [first, first + 1, first + 2].forEach { if counts[$0] == 0 { counts.removeValue(forKey: $0) } }
+            if let rest = decomposeMelds(counts) {
+                return [[first, first + 1, first + 2]] + rest
+            }
+        }
+
+        return nil
+    }
+
+    private func isSequence(_ meld: [Int]) -> Bool {
+        meld.count == 3 && Set(meld).count == 3 && meld[0] / 10 < 3 && meld[0] + 1 == meld[1] && meld[1] + 1 == meld[2]
+    }
+
+    private func isPinfu(pair: Int, melds: [[Int]], playerIndex: Int) -> Bool {
+        guard melds.allSatisfy(isSequence) else { return false }
+        let seatWindKey = 31 + playerIndex
+        let roundWindKey = roundState.wind == .east ? 31 : 32
+        return ![seatWindKey, roundWindKey, 35, 36, 37].contains(pair)
+    }
+
+    private func hasIipeikou(_ sequences: [[Int]]) -> Bool {
+        let grouped = Dictionary(grouping: sequences.map { $0[0] }, by: { $0 })
+        return grouped.values.contains { $0.count >= 2 }
+    }
+
+    private func hasSanshoku(_ sequences: [[Int]]) -> Bool {
+        for rank in 1...7 {
+            let needed = [rank, 10 + rank, 20 + rank]
+            if needed.allSatisfy({ key in sequences.contains(where: { $0.first == key }) }) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func hasIttsu(_ sequences: [[Int]]) -> Bool {
+        for base in [0, 10, 20] {
+            let needed = [base + 1, base + 4, base + 7]
+            if needed.allSatisfy({ key in sequences.contains(where: { $0.first == key }) }) {
+                return true
+            }
+        }
         return false
     }
 

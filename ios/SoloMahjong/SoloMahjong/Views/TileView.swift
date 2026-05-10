@@ -154,6 +154,7 @@ private struct GeneratedTileMark: View {
             .interpolation(.high)
             .scaledToFit()
             .padding(dense ? -1.2 : -0.6)
+            .scaleEffect(name.hasPrefix("Sou") ? (dense ? 1.34 : 1.22) : 1.0)
             .shadow(color: .black.opacity(0.10), radius: dense ? 0.25 : 0.45, x: 0, y: 0.35)
     }
 }

@@ -331,6 +331,7 @@ private struct ActionHelpTerm: Identifiable {
         "チー": ActionHelpTerm(word: "チー", reading: "チー", meaning: "左の人が捨てた牌だけを使って、同じ種類の連番3枚を作る鳴きです。例：3萬を鳴いて1萬2萬3萬にする。"),
         "ポン": ActionHelpTerm(word: "ポン", reading: "ポン", meaning: "誰かが捨てた牌と、自分の同じ牌2枚で同じ牌3枚の刻子を作る鳴きです。"),
         "カン": ActionHelpTerm(word: "カン", reading: "カン", meaning: "同じ牌4枚で槓子を作る行為です。成立すると嶺上牌を1枚引きます。"),
+        "ロン": ActionHelpTerm(word: "ロン", reading: "ロン", meaning: "他家が捨てた牌で和了することです。役がない形ではロンできません。"),
         "槓": ActionHelpTerm(word: "槓", reading: "カン", meaning: "同じ牌4枚で作る面子です。暗槓は手牌の4枚だけで作ります。"),
         "立直": ActionHelpTerm(word: "立直", reading: "リーチ", meaning: "鳴いていない状態であと1枚で和了できる時に宣言します。1000点を供託に出し、リーチという役になります。")
     ]
